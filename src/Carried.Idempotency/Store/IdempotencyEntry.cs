@@ -1,6 +1,6 @@
 namespace Carried.Idempotency.Store;
 
-public sealed class IdempotencyEntry
+internal sealed class IdempotencyEntry
 {
     public required string Fingerprint { get; init; }
     public required IdempotencyState State { get; init; }
