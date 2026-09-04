@@ -1,6 +1,6 @@
 namespace Carried.Idempotency.Store;
 
-public enum IdempotencyState
+internal enum IdempotencyState
 {
     InProgress,
     Completed
