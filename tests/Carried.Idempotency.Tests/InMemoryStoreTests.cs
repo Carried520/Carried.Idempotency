@@ -1,64 +1,64 @@
-﻿namespace Carried.Idempotency.Tests;
+﻿using Carried.Idempotency.Store;
 
-using Idempotency;
+namespace Carried.Idempotency.Tests;
 
 public class InMemoryIdempotencyStoreTests
 {
     [Fact]
-    public void TryAcquire_FirstAttempt_ReturnsAcquired()
+    public async Task TryAcquire_FirstAttempt_ReturnsAcquired()
     {
         var store = new InMemoryIdempotencyStore();
         var key = new IdempotencyKey("orders", "123");
 
-        IdempotencyAcquireResult result = store.TryAcquire(key, "fingerprint");
+        IdempotencyAcquireResult result = await store.TryAcquireAsync(key, "fingerprint");
 
         Assert.Equal(IdempotencyAcquireStatus.Acquired, result.Status);
         Assert.NotNull(result.OwnerToken);
     }
 
     [Fact]
-    public void TryAcquire_SameKeyAndFingerprint_ReturnsInProgress()
+    public async Task TryAcquire_SameKeyAndFingerprint_ReturnsInProgress()
     {
         var store = new InMemoryIdempotencyStore();
         var key = new IdempotencyKey("orders", "123");
 
-        store.TryAcquire(key, "fingerprint");
+        await store.TryAcquireAsync(key, "fingerprint");
 
-        IdempotencyAcquireResult result = store.TryAcquire(key, "fingerprint");
+        IdempotencyAcquireResult result = await store.TryAcquireAsync(key, "fingerprint");
 
         Assert.Equal(IdempotencyAcquireStatus.InProgress, result.Status);
     }
 
     [Fact]
-    public void TryAcquire_SameKeyDifferentFingerprint_ReturnsConflict()
+    public async Task TryAcquire_SameKeyDifferentFingerprint_ReturnsConflict()
     {
         var store = new InMemoryIdempotencyStore();
         var key = new IdempotencyKey("orders", "123");
 
-        store.TryAcquire(key, "fingerprint-a");
+        await store.TryAcquireAsync(key, "fingerprint-a");
 
-        IdempotencyAcquireResult result = store.TryAcquire(key, "fingerprint-b");
+        IdempotencyAcquireResult result = await store.TryAcquireAsync(key, "fingerprint-b");
 
         Assert.Equal(IdempotencyAcquireStatus.Conflict, result.Status);
     }
-    
-    
+
+
     [Fact]
-    public void TryComplete_WithCorrectOwner_CompletesEntry()
+    public async Task TryComplete_WithCorrectOwner_CompletesEntry()
     {
         var store = new InMemoryIdempotencyStore();
         var key = new IdempotencyKey("orders", "123");
 
-        IdempotencyAcquireResult acquired = store.TryAcquire(key, "fingerprint");
+        IdempotencyAcquireResult acquired = await store.TryAcquireAsync(key, "fingerprint");
 
         byte[] payload = [1, 2, 3];
 
-        bool completed = store.TryComplete(
+        bool completed = await store.TryCompleteAsync(
             key,
             acquired.OwnerToken!.Value,
             payload);
 
-        IdempotencyAcquireResult replay = store.TryAcquire(key, "fingerprint");
+        IdempotencyAcquireResult replay = await store.TryAcquireAsync(key, "fingerprint");
 
         Assert.True(completed);
         Assert.Equal(IdempotencyAcquireStatus.Completed, replay.Status);
@@ -66,14 +66,14 @@ public class InMemoryIdempotencyStoreTests
     }
 
     [Fact]
-    public void TryComplete_WithWrongOwner_ReturnsFalse()
+    public async Task TryComplete_WithWrongOwner_ReturnsFalse()
     {
         var store = new InMemoryIdempotencyStore();
         var key = new IdempotencyKey("orders", "123");
 
-        store.TryAcquire(key, "fingerprint");
+        await store.TryAcquireAsync(key, "fingerprint");
 
-        bool completed = store.TryComplete(
+        bool completed = await store.TryCompleteAsync(
             key,
             Guid.NewGuid(),
             [1, 2, 3]);
@@ -82,18 +82,18 @@ public class InMemoryIdempotencyStoreTests
     }
 
     [Fact]
-    public void TryRelease_WithCorrectOwner_AllowsAcquireAgain()
+    public async Task TryRelease_WithCorrectOwner_AllowsAcquireAgain()
     {
         var store = new InMemoryIdempotencyStore();
         var key = new IdempotencyKey("orders", "123");
 
-        IdempotencyAcquireResult acquired = store.TryAcquire(key, "fingerprint");
+        IdempotencyAcquireResult acquired = await store.TryAcquireAsync(key, "fingerprint");
 
-        bool released = store.TryRelease(
+        bool released = await store.TryReleaseAsync(
             key,
             acquired.OwnerToken!.Value);
 
-        IdempotencyAcquireResult secondAcquire = store.TryAcquire(
+        IdempotencyAcquireResult secondAcquire = await store.TryAcquireAsync(
             key,
             "fingerprint");
 
@@ -102,37 +102,39 @@ public class InMemoryIdempotencyStoreTests
     }
 
     [Fact]
-    public void TryRelease_WithWrongOwner_ReturnsFalse()
+    public async Task TryRelease_WithWrongOwner_ReturnsFalse()
     {
         var store = new InMemoryIdempotencyStore();
         var key = new IdempotencyKey("orders", "123");
 
-        store.TryAcquire(key, "fingerprint");
+        await store.TryAcquireAsync(key, "fingerprint");
 
-        bool released = store.TryRelease(
+        bool released = await store.TryReleaseAsync(
             key,
             Guid.NewGuid());
 
         Assert.False(released);
 
-        IdempotencyAcquireResult result = store.TryAcquire(
+        IdempotencyAcquireResult result = await store.TryAcquireAsync(
             key,
             "fingerprint");
 
         Assert.Equal(IdempotencyAcquireStatus.InProgress, result.Status);
     }
-    
+
     [Fact]
-    public void TryAcquire_ConcurrentCalls_OnlyOneAcquires()
+    public async Task TryAcquire_ConcurrentCalls_OnlyOneAcquires()
     {
         var store = new InMemoryIdempotencyStore();
         var key = new IdempotencyKey("orders", "123");
 
-        IdempotencyAcquireResult[] results = Enumerable
+        Task<IdempotencyAcquireResult>[] tasks = Enumerable
             .Range(0, 100)
             .AsParallel()
-            .Select(_ => store.TryAcquire(key, "fingerprint"))
+            .Select(_ => store.TryAcquireAsync(key, "fingerprint").AsTask())
             .ToArray();
+
+        IdempotencyAcquireResult[] results = await Task.WhenAll(tasks);
 
         Assert.Single(results, x => x.Status == IdempotencyAcquireStatus.Acquired);
 

@@ -1,5 +1,6 @@
 using Carried.Idempotency.Exceptions;
 using Carried.Idempotency.Serialization;
+using Carried.Idempotency.Store;
 
 namespace Carried.Idempotency.Tests;
 
