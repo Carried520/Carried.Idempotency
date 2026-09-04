@@ -1,4 +1,6 @@
-﻿using Carried.Idempotency.Exceptions;
+﻿using System.Runtime.ExceptionServices;
+using Carried.Idempotency.Exceptions;
+using Carried.Idempotency.Options;
 using Carried.Idempotency.Serialization;
 using Carried.Idempotency.Store;
 
@@ -8,11 +10,22 @@ public sealed class IdempotencyService
 {
     private readonly IIdempotencyStore _store;
     private readonly IIdempotencySerializer _serializer;
+    private readonly IdempotencyOptions _idempotencyOptions;
+    private readonly TimeProvider _timeProvider;
 
-    public IdempotencyService(IIdempotencyStore store, IIdempotencySerializer serializer)
+    public IdempotencyService(IIdempotencyStore store, IIdempotencySerializer serializer, IdempotencyOptions idempotencyOptions, TimeProvider timeProvider)
     {
+        ArgumentNullException.ThrowIfNull(store);
+        ArgumentNullException.ThrowIfNull(serializer);
+        ArgumentNullException.ThrowIfNull(idempotencyOptions);
+        ArgumentNullException.ThrowIfNull(timeProvider);
+
+        idempotencyOptions.Validate();
+
         _store = store;
         _serializer = serializer;
+        _idempotencyOptions = idempotencyOptions;
+        _timeProvider = timeProvider;
     }
 
     public async Task<T?> ExecuteAsync<T>(
@@ -26,27 +39,66 @@ public sealed class IdempotencyService
         {
             case IdempotencyAcquireStatus.Acquired:
             {
+                using var heartbeatStopCts = new CancellationTokenSource();
+                using var leaseLossCts = new CancellationTokenSource();
+                using var operationCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, leaseLossCts.Token);
+
                 Guid ownerToken = acquireResult.OwnerToken
                                   ?? throw new InvalidOperationException("Acquired result has no owner token.");
 
-                T? operationResult;
+                T? operationResult = default;
+
+                Task heartbeatTask = RunLeaseHeartbeatAsync(key, ownerToken, leaseLossCts, heartbeatStopCts.Token);
+
+                ExceptionDispatchInfo? operationException = null;
 
                 try
                 {
-                    operationResult = await operation(cancellationToken);
+                    operationResult = await operation(operationCts.Token);
+                }
+                catch (Exception ex)
+                {
+                    operationException = ExceptionDispatchInfo.Capture(ex);
+                }
+
+                if (operationException is not null)
+                {
+                    ExceptionDispatchInfo? heartbeatException =
+                        await StopHeartbeatAsync(heartbeatStopCts, heartbeatTask);
+
+                    await TryReleaseBestEffortAsync(key, ownerToken);
+
+                    if (operationException.SourceException is OperationCanceledException &&
+                        leaseLossCts.IsCancellationRequested &&
+                        !cancellationToken.IsCancellationRequested)
+                    {
+                        heartbeatException?.Throw();
+                        throw new IdempotencyLeaseLostException();
+                    }
+
+                    operationException.Throw();
+                }
+
+                bool completed;
+
+                try
+                {
+                    byte[] payload = _serializer.Serialize(operationResult);
+                    completed = await _store.TryCompleteAsync(key, ownerToken, payload, CancellationToken.None);
                 }
                 catch
                 {
-                    await _store.TryReleaseAsync(key, ownerToken, CancellationToken.None);
+                    await StopHeartbeatAsync(heartbeatStopCts, heartbeatTask);
                     throw;
                 }
 
-                byte[] payload = _serializer.Serialize(operationResult);
+                ExceptionDispatchInfo? finalHeartbeatException = await StopHeartbeatAsync(heartbeatStopCts, heartbeatTask);
 
-                if (!await _store.TryCompleteAsync(key, ownerToken, payload, CancellationToken.None))
-                    throw new InvalidOperationException("Could not complete idempotent operation.");
+                if (completed) return operationResult;
 
-                return operationResult;
+                finalHeartbeatException?.Throw();
+
+                throw new IdempotencyLeaseLostException();
             }
             case IdempotencyAcquireStatus.Completed:
             {
@@ -60,6 +112,66 @@ public sealed class IdempotencyService
                 throw new IdempotencyInProgressException();
             default:
                 throw new InvalidOperationException($"Unknown acquire status: {acquireResult.Status}");
+        }
+    }
+
+    private static async Task<ExceptionDispatchInfo?> StopHeartbeatAsync(CancellationTokenSource heartbeatStopCts, Task heartbeatTask)
+    {
+        await heartbeatStopCts.CancelAsync();
+
+        try
+        {
+            await heartbeatTask;
+            return null;
+        }
+        catch (Exception ex)
+        {
+            return ExceptionDispatchInfo.Capture(ex);
+        }
+    }
+
+    private async ValueTask TryReleaseBestEffortAsync(
+        IdempotencyKey key,
+        Guid ownerToken)
+    {
+        try
+        {
+            await _store.TryReleaseAsync(
+                key,
+                ownerToken,
+                CancellationToken.None);
+        }
+        catch
+        {
+            // TODO: observability
+        }
+    }
+
+    private async Task RunLeaseHeartbeatAsync(IdempotencyKey key, Guid ownerToken, CancellationTokenSource leaseLostCts, CancellationToken cancellationToken)
+    {
+        TimeSpan interval = TimeSpan.FromTicks(_idempotencyOptions.LeaseDuration.Ticks / 3);
+
+        try
+        {
+            while (true)
+            {
+                await Task.Delay(interval, _timeProvider, cancellationToken);
+
+                bool renewed = await _store.TryRenewLeaseAsync(key, ownerToken, cancellationToken);
+
+                if (renewed) continue;
+                await leaseLostCts.CancelAsync();
+                return;
+            }
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            // expected heartbeat shutdown
+        }
+        catch
+        {
+            await leaseLostCts.CancelAsync();
+            throw;
         }
     }
 }
