@@ -6,7 +6,7 @@ using Microsoft.AspNetCore.Http;
 
 namespace Carried.Idempotency.AspNet.Tests;
 
-public sealed class IdempotencyIntegrationTests
+public sealed partial class IdempotencyIntegrationTests
 {
     [Fact]
     public async Task UnmarkedEndpoint_DoesNotRequireIdempotencyKey()

@@ -1,12 +1,12 @@
 using Microsoft.AspNetCore.Builder;
-using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Routing;
 using Microsoft.AspNetCore.TestHost;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace Carried.Idempotency.AspNet.Tests;
 
-internal sealed class IdempotencyTestServer : IAsyncDisposable
+internal sealed class IdempotencyTestServer :
+    IAsyncDisposable
 {
     private readonly WebApplication _app;
 
@@ -31,9 +31,11 @@ internal sealed class IdempotencyTestServer : IAsyncDisposable
 
         builder.Services.AddIdempotency();
 
-        configureServices?.Invoke(builder.Services);
+        configureServices?.Invoke(
+            builder.Services);
 
-        WebApplication app = builder.Build();
+        WebApplication app =
+            builder.Build();
 
         app.UseIdempotency();
 
@@ -52,6 +54,7 @@ internal sealed class IdempotencyTestServer : IAsyncDisposable
     public async ValueTask DisposeAsync()
     {
         Client.Dispose();
+
         await _app.DisposeAsync();
     }
 }
