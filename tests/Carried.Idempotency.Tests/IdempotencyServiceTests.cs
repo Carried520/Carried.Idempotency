@@ -1,21 +1,29 @@
 using Carried.Idempotency.Exceptions;
+using Carried.Idempotency.Options;
 using Carried.Idempotency.Serialization;
 using Carried.Idempotency.Store;
 
 namespace Carried.Idempotency.Tests;
 
-public class IdempotencyServiceTests
+public partial class IdempotencyServiceTests
 {
     [Fact]
     public async Task ExecuteAsync_FirstExecution_RunsOperationAndReturnsResult()
     {
-        var store = new InMemoryIdempotencyStore();
+        var options = new IdempotencyOptions();
+        TimeProvider timeProvider = TimeProvider.System;
+
+        var store = new InMemoryIdempotencyStore(options, timeProvider);
         var serializer = new JsonIdempotencySerializer();
-        var service = new IdempotencyService(store, serializer);
+        var service = new IdempotencyService(
+            store,
+            serializer,
+            options,
+            timeProvider);
 
         var key = new IdempotencyKey("orders", "123");
 
-        var executionCount = 0;
+        int executionCount = 0;
 
         string? result = await service.ExecuteAsync(
             key,
@@ -33,9 +41,16 @@ public class IdempotencyServiceTests
     [Fact]
     public async Task ExecuteAsync_CompletedOperation_ReplaysResultWithoutExecutingAgain()
     {
-        var store = new InMemoryIdempotencyStore();
+        var options = new IdempotencyOptions();
+        TimeProvider timeProvider = TimeProvider.System;
+
+        var store = new InMemoryIdempotencyStore(options, timeProvider);
         var serializer = new JsonIdempotencySerializer();
-        var service = new IdempotencyService(store, serializer);
+        var service = new IdempotencyService(
+            store,
+            serializer,
+            options,
+            timeProvider);
 
         var key = new IdempotencyKey("orders", "123");
 
@@ -66,9 +81,16 @@ public class IdempotencyServiceTests
     [Fact]
     public async Task ExecuteAsync_OperationThrows_ReleasesEntry()
     {
-        var store = new InMemoryIdempotencyStore();
+        var options = new IdempotencyOptions();
+        TimeProvider timeProvider = TimeProvider.System;
+
+        var store = new InMemoryIdempotencyStore(options, timeProvider);
         var serializer = new JsonIdempotencySerializer();
-        var service = new IdempotencyService(store, serializer);
+        var service = new IdempotencyService(
+            store,
+            serializer,
+            options,
+            timeProvider);
 
         var key = new IdempotencyKey("orders", "123");
 
@@ -89,9 +111,16 @@ public class IdempotencyServiceTests
     [Fact]
     public async Task ExecuteAsync_SameKeyDifferentFingerprint_ThrowsConflictException()
     {
-        var store = new InMemoryIdempotencyStore();
+        var options = new IdempotencyOptions();
+        TimeProvider timeProvider = TimeProvider.System;
+
+        var store = new InMemoryIdempotencyStore(options, timeProvider);
         var serializer = new JsonIdempotencySerializer();
-        var service = new IdempotencyService(store, serializer);
+        var service = new IdempotencyService(
+            store,
+            serializer,
+            options,
+            timeProvider);
 
         var key = new IdempotencyKey("orders", "123");
 
@@ -110,14 +139,26 @@ public class IdempotencyServiceTests
     [Fact]
     public async Task ExecuteAsync_OperationAlreadyInProgress_ThrowsInProgressException()
     {
-        var store = new InMemoryIdempotencyStore();
+        var options = new IdempotencyOptions();
+        TimeProvider timeProvider = TimeProvider.System;
+
+        var store = new InMemoryIdempotencyStore(options, timeProvider);
         var serializer = new JsonIdempotencySerializer();
-        var service = new IdempotencyService(store, serializer);
+        var service = new IdempotencyService(
+            store,
+            serializer,
+            options,
+            timeProvider);
 
         var key = new IdempotencyKey("orders", "123");
 
-        var operationStarted = new TaskCompletionSource<bool>();
-        var allowCompletion = new TaskCompletionSource<bool>();
+        var operationStarted =
+            new TaskCompletionSource<bool>(
+                TaskCreationOptions.RunContinuationsAsynchronously);
+
+        var allowCompletion =
+            new TaskCompletionSource<bool>(
+                TaskCreationOptions.RunContinuationsAsynchronously);
 
         Task<string?> firstExecution = service.ExecuteAsync(
             key,

@@ -1,4 +1,4 @@
-namespace Carried.Idempotency;
+namespace Carried.Idempotency.Store;
 
 public enum IdempotencyAcquireStatus
 {
