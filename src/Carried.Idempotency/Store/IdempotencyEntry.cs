@@ -9,4 +9,5 @@ public sealed class IdempotencyEntry
     public Guid? OwnerToken { get; init; }
 
     public DateTimeOffset? LeaseExpiresAt { get; init; }
+    public DateTimeOffset? CompletedExpiresAt { get; init; }
 }
