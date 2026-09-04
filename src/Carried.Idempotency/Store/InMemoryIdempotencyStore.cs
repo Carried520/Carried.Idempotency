@@ -1,27 +1,39 @@
 using System.Collections.Concurrent;
+using Carried.Idempotency.Options;
 
 namespace Carried.Idempotency.Store;
 
 internal sealed class InMemoryIdempotencyStore : IIdempotencyStore
 {
+    private readonly IdempotencyOptions _idempotencyOptions;
+    private readonly TimeProvider _timeProvider;
     private readonly ConcurrentDictionary<IdempotencyKey, IdempotencyEntry> _entries = new();
+
+    public InMemoryIdempotencyStore(IdempotencyOptions idempotencyOptions, TimeProvider timeProvider)
+    {
+        _idempotencyOptions = idempotencyOptions;
+        _timeProvider = timeProvider;
+    }
 
     public ValueTask<IdempotencyAcquireResult> TryAcquireAsync(IdempotencyKey key, string fingerprint, CancellationToken cancellationToken = default)
     {
         cancellationToken.ThrowIfCancellationRequested();
         while (true)
         {
-            var entry = new IdempotencyEntry
+            DateTimeOffset now = _timeProvider.GetUtcNow();
+            var candidateEntry = new IdempotencyEntry
             {
                 Fingerprint = fingerprint,
                 State = IdempotencyState.InProgress,
                 OwnerToken = Guid.NewGuid(),
-                Payload = null
+                Payload = null,
+                LeaseExpiresAt = now + _idempotencyOptions.LeaseDuration
             };
 
-            if (_entries.TryAdd(key, entry))
+            if (_entries.TryAdd(key, candidateEntry))
             {
-                return ValueTask.FromResult(new IdempotencyAcquireResult { Status = IdempotencyAcquireStatus.Acquired, OwnerToken = entry.OwnerToken });
+                return ValueTask.FromResult(new IdempotencyAcquireResult
+                    { Status = IdempotencyAcquireStatus.Acquired, OwnerToken = candidateEntry.OwnerToken });
             }
 
             if (!_entries.TryGetValue(key, out IdempotencyEntry? existingEntry))
@@ -32,16 +44,30 @@ internal sealed class InMemoryIdempotencyStore : IIdempotencyStore
             if (existingEntry.Fingerprint != fingerprint)
                 return ValueTask.FromResult(new IdempotencyAcquireResult { Status = IdempotencyAcquireStatus.Conflict });
 
-            return ValueTask.FromResult(existingEntry.State switch
+            switch (existingEntry.State)
             {
-                IdempotencyState.InProgress => new IdempotencyAcquireResult { Status = IdempotencyAcquireStatus.InProgress },
-                IdempotencyState.Completed => new IdempotencyAcquireResult
-                {
-                    Status = IdempotencyAcquireStatus.Completed,
-                    Payload = existingEntry.Payload,
-                },
-                _ => throw new InvalidOperationException()
-            });
+                case IdempotencyState.InProgress:
+                    if (existingEntry.LeaseExpiresAt is null)
+                        throw new InvalidOperationException("LeaseExpiresAt is null");
+
+                    if (now < existingEntry.LeaseExpiresAt)
+                        return ValueTask.FromResult(new IdempotencyAcquireResult { Status = IdempotencyAcquireStatus.InProgress });
+
+                    if (!_entries.TryUpdate(key, candidateEntry, existingEntry))
+                        continue;
+
+                    return ValueTask.FromResult(new IdempotencyAcquireResult
+                        { Status = IdempotencyAcquireStatus.Acquired, OwnerToken = candidateEntry.OwnerToken });
+
+                case IdempotencyState.Completed:
+                    return ValueTask.FromResult(new IdempotencyAcquireResult
+                    {
+                        Status = IdempotencyAcquireStatus.Completed,
+                        Payload = existingEntry.Payload
+                    });
+                default:
+                    throw new InvalidOperationException();
+            }
         }
     }
 
@@ -54,11 +80,19 @@ internal sealed class InMemoryIdempotencyStore : IIdempotencyStore
             return ValueTask.FromResult(false);
         }
 
-        IdempotencyEntry completedEntry = existingEntry with
+        if (existingEntry.LeaseExpiresAt is null)
+            throw new InvalidOperationException("LeaseExpiresAt is null");
+
+        if (_timeProvider.GetUtcNow() >= existingEntry.LeaseExpiresAt)
+            return ValueTask.FromResult(false);
+
+        var completedEntry = new IdempotencyEntry
         {
+            Fingerprint = existingEntry.Fingerprint,
             State = IdempotencyState.Completed,
             OwnerToken = null,
-            Payload = payload
+            Payload = payload,
+            LeaseExpiresAt = null
         };
 
         return ValueTask.FromResult(_entries.TryUpdate(key, completedEntry, existingEntry));
@@ -75,6 +109,37 @@ internal sealed class InMemoryIdempotencyStore : IIdempotencyStore
             return ValueTask.FromResult(false);
         }
 
+        if (existingEntry.LeaseExpiresAt is null)
+            throw new InvalidOperationException("LeaseExpiresAt is null");
+
+        if (_timeProvider.GetUtcNow() >= existingEntry.LeaseExpiresAt)
+            return ValueTask.FromResult(false);
+
         return ValueTask.FromResult(_entries.TryRemove(new KeyValuePair<IdempotencyKey, IdempotencyEntry>(key, existingEntry)));
+    }
+
+    public ValueTask<bool> TryRenewLeaseAsync(IdempotencyKey key, Guid ownerToken, CancellationToken cancellationToken = default)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+
+        if (!_entries.TryGetValue(key, out IdempotencyEntry? existingEntry) || existingEntry.State is not IdempotencyState.InProgress ||
+            ownerToken != existingEntry.OwnerToken)
+            return ValueTask.FromResult(false);
+
+        if (existingEntry.LeaseExpiresAt is null)
+            throw new InvalidOperationException("LeaseExpiresAt is null");
+
+        DateTimeOffset now = _timeProvider.GetUtcNow();
+
+        if (now >= existingEntry.LeaseExpiresAt)
+            return ValueTask.FromResult(false);
+
+        var renewedEntry = new IdempotencyEntry
+        {
+            Fingerprint = existingEntry.Fingerprint, State = IdempotencyState.InProgress, OwnerToken = existingEntry.OwnerToken, Payload = null,
+            LeaseExpiresAt = now + _idempotencyOptions.LeaseDuration
+        };
+
+        return ValueTask.FromResult(_entries.TryUpdate(key, renewedEntry, existingEntry));
     }
 }
