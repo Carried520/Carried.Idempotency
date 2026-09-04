@@ -1,5 +1,6 @@
 namespace Carried.Idempotency.Store;
 
+
 public interface IIdempotencyStore
 {
     ValueTask<IdempotencyAcquireResult> TryAcquireAsync(IdempotencyKey key, string fingerprint , CancellationToken cancellationToken = default);
