@@ -1,0 +1,30 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 12.00
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Carried.Idempotency", "src\Carried.Idempotency\Carried.Idempotency.csproj", "{8E8A2892-9176-4EB1-B3E4-3E2863478BE9}"
+EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "src", "src", "{6C54E45C-9729-4D5C-8F50-3E9FCB7A6FDB}"
+EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "tests", "tests", "{4616ACCC-DFB2-43F8-AFBD-143FBBC450D3}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Carried.Idempotency.Tests", "tests\Carried.Idempotency.Tests\Carried.Idempotency.Tests.csproj", "{E59BAB74-42BC-4195-A8A5-C7A49ABCC956}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{8E8A2892-9176-4EB1-B3E4-3E2863478BE9}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{8E8A2892-9176-4EB1-B3E4-3E2863478BE9}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{8E8A2892-9176-4EB1-B3E4-3E2863478BE9}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{8E8A2892-9176-4EB1-B3E4-3E2863478BE9}.Release|Any CPU.Build.0 = Release|Any CPU
+		{E59BAB74-42BC-4195-A8A5-C7A49ABCC956}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{E59BAB74-42BC-4195-A8A5-C7A49ABCC956}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{E59BAB74-42BC-4195-A8A5-C7A49ABCC956}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{E59BAB74-42BC-4195-A8A5-C7A49ABCC956}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(NestedProjects) = preSolution
+		{8E8A2892-9176-4EB1-B3E4-3E2863478BE9} = {6C54E45C-9729-4D5C-8F50-3E9FCB7A6FDB}
+		{E59BAB74-42BC-4195-A8A5-C7A49ABCC956} = {4616ACCC-DFB2-43F8-AFBD-143FBBC450D3}
+	EndGlobalSection
+EndGlobal
