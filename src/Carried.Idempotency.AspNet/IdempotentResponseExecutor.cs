@@ -26,9 +26,23 @@ public sealed class IdempotentResponseExecutor
             response = await idempotencyService.ExecuteAsync(
                 key,
                 fingerprint,
-                async _ =>
+                async cancellationToken =>
                 {
-                    await next(context);
+                    CancellationToken originalRequestAborted =
+                        context.RequestAborted;
+
+                    context.RequestAborted =
+                        cancellationToken;
+
+                    try
+                    {
+                        await next(context);
+                    }
+                    finally
+                    {
+                        context.RequestAborted =
+                            originalRequestAborted;
+                    }
 
                     byte[] body =
                         responseBuffer.ToArray();
