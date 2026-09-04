@@ -1,5 +1,6 @@
 ﻿using Carried.Idempotency.Exceptions;
 using Carried.Idempotency.Serialization;
+using Carried.Idempotency.Store;
 
 namespace Carried.Idempotency;
 
@@ -20,7 +21,7 @@ public sealed class IdempotencyService
         Func<CancellationToken, Task<T?>> operation,
         CancellationToken cancellationToken = default)
     {
-        IdempotencyAcquireResult acquireResult = _store.TryAcquire(key, fingerprint);
+        IdempotencyAcquireResult acquireResult = await _store.TryAcquireAsync(key, fingerprint, cancellationToken);
         switch (acquireResult.Status)
         {
             case IdempotencyAcquireStatus.Acquired:
@@ -36,13 +37,13 @@ public sealed class IdempotencyService
                 }
                 catch
                 {
-                    _store.TryRelease(key, ownerToken);
+                    await _store.TryReleaseAsync(key, ownerToken, CancellationToken.None);
                     throw;
                 }
 
                 byte[] payload = _serializer.Serialize(operationResult);
 
-                if (!_store.TryComplete(key, ownerToken, payload))
+                if (!await _store.TryCompleteAsync(key, ownerToken, payload, CancellationToken.None))
                     throw new InvalidOperationException("Could not complete idempotent operation.");
 
                 return operationResult;
