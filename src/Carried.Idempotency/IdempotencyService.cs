@@ -48,6 +48,26 @@ public sealed class IdempotencyService
 
         return new IdempotencyService(store, serializer, options, timeProvider);
     }
+    
+    
+    public static IdempotencyService Create(
+        IIdempotencyStore store,
+        IIdempotencySerializer serializer,
+        IdempotencyOptions options,
+        TimeProvider? timeProvider = null)
+    {
+        ArgumentNullException.ThrowIfNull(store);
+        ArgumentNullException.ThrowIfNull(serializer);
+        ArgumentNullException.ThrowIfNull(options);
+
+        options.Validate();
+
+        return new IdempotencyService(
+            store,
+            serializer,
+            options,
+            timeProvider ?? TimeProvider.System);
+    }
 
     /// <summary>
     /// Executes an operation under the supplied idempotency key.
