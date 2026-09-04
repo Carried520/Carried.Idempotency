@@ -21,19 +21,21 @@ internal sealed class InMemoryIdempotencyStore : IIdempotencyStore
         while (true)
         {
             DateTimeOffset now = _timeProvider.GetUtcNow();
+            var ownerToken = Guid.NewGuid();
             var candidateEntry = new IdempotencyEntry
             {
                 Fingerprint = fingerprint,
                 State = IdempotencyState.InProgress,
-                OwnerToken = Guid.NewGuid(),
+                OwnerToken = ownerToken,
                 Payload = null,
-                LeaseExpiresAt = now + _idempotencyOptions.LeaseDuration
+                LeaseExpiresAt = now + _idempotencyOptions.LeaseDuration,
+                CompletedExpiresAt = null
             };
 
             if (_entries.TryAdd(key, candidateEntry))
             {
-                return ValueTask.FromResult(new IdempotencyAcquireResult
-                    { Status = IdempotencyAcquireStatus.Acquired, OwnerToken = candidateEntry.OwnerToken });
+                return ValueTask.FromResult(
+                    IdempotencyAcquireResult.Acquired(ownerToken));
             }
 
             if (!_entries.TryGetValue(key, out IdempotencyEntry? existingEntry))
@@ -45,43 +47,37 @@ internal sealed class InMemoryIdempotencyStore : IIdempotencyStore
             {
                 case IdempotencyState.InProgress:
                     if (existingEntry.Fingerprint != fingerprint)
-                        return ValueTask.FromResult(new IdempotencyAcquireResult { Status = IdempotencyAcquireStatus.Conflict });
+                        return ValueTask.FromResult(IdempotencyAcquireResult.Conflict());
                     if (existingEntry.LeaseExpiresAt is null)
                         throw new InvalidOperationException("LeaseExpiresAt is null");
 
                     if (now < existingEntry.LeaseExpiresAt)
-                        return ValueTask.FromResult(new IdempotencyAcquireResult { Status = IdempotencyAcquireStatus.InProgress });
+                        return ValueTask.FromResult(IdempotencyAcquireResult.InProgress());
 
                     if (!_entries.TryUpdate(key, candidateEntry, existingEntry))
                         continue;
 
-                    return ValueTask.FromResult(new IdempotencyAcquireResult
-                        { Status = IdempotencyAcquireStatus.Acquired, OwnerToken = candidateEntry.OwnerToken });
+                    return ValueTask.FromResult(IdempotencyAcquireResult.Acquired(ownerToken));
 
                 case IdempotencyState.Completed:
                     if (existingEntry.CompletedExpiresAt is null)
                         throw new InvalidOperationException("CompletedExpiresAt is null");
 
+                    if (existingEntry.Payload is null)
+                        throw new InvalidOperationException("Payload is null");
+
                     if (now < existingEntry.CompletedExpiresAt)
                     {
                         if (existingEntry.Fingerprint != fingerprint)
-                            return ValueTask.FromResult(new IdempotencyAcquireResult { Status = IdempotencyAcquireStatus.Conflict });
+                            return ValueTask.FromResult(IdempotencyAcquireResult.Conflict());
 
-                        return ValueTask.FromResult(new IdempotencyAcquireResult
-                        {
-                            Status = IdempotencyAcquireStatus.Completed,
-                            Payload = existingEntry.Payload
-                        });
+                        return ValueTask.FromResult(IdempotencyAcquireResult.Completed(existingEntry.Payload));
                     }
 
                     if (!_entries.TryUpdate(key, candidateEntry, existingEntry))
                         continue;
 
-                    return ValueTask.FromResult(new IdempotencyAcquireResult
-                    {
-                        Status = IdempotencyAcquireStatus.Acquired,
-                        OwnerToken = candidateEntry.OwnerToken
-                    });
+                    return ValueTask.FromResult(IdempotencyAcquireResult.Acquired(ownerToken));
 
                 default:
                     throw new InvalidOperationException();
@@ -157,7 +153,8 @@ internal sealed class InMemoryIdempotencyStore : IIdempotencyStore
         var renewedEntry = new IdempotencyEntry
         {
             Fingerprint = existingEntry.Fingerprint, State = IdempotencyState.InProgress, OwnerToken = existingEntry.OwnerToken, Payload = null,
-            LeaseExpiresAt = now + _idempotencyOptions.LeaseDuration
+            LeaseExpiresAt = now + _idempotencyOptions.LeaseDuration,
+            CompletedExpiresAt = null
         };
 
         return ValueTask.FromResult(_entries.TryUpdate(key, renewedEntry, existingEntry));
