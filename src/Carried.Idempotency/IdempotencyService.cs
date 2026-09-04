@@ -10,8 +10,9 @@ public sealed class IdempotencyService
 {
     private readonly IIdempotencyStore _store;
     private readonly IIdempotencySerializer _serializer;
-    private readonly IdempotencyOptions _idempotencyOptions;
     private readonly TimeProvider _timeProvider;
+
+    private readonly TimeSpan _heartbeatInterval;
 
     public IdempotencyService(IIdempotencyStore store, IIdempotencySerializer serializer, IdempotencyOptions idempotencyOptions, TimeProvider timeProvider)
     {
@@ -24,8 +25,20 @@ public sealed class IdempotencyService
 
         _store = store;
         _serializer = serializer;
-        _idempotencyOptions = idempotencyOptions;
         _timeProvider = timeProvider;
+        _heartbeatInterval = TimeSpan.FromTicks(idempotencyOptions.LeaseDuration.Ticks / 3);
+    }
+
+
+    public static IdempotencyService CreateInMemory(IdempotencyOptions? options = null, TimeProvider? timeProvider = null)
+    {
+        options ??= new IdempotencyOptions();
+        timeProvider ??= TimeProvider.System;
+        
+        var serializer = new JsonIdempotencySerializer();
+        var store = new InMemoryIdempotencyStore(options, timeProvider);
+
+        return new IdempotencyService(store, serializer, options, timeProvider);
     }
 
     public async Task<T?> ExecuteAsync<T>(
@@ -34,6 +47,10 @@ public sealed class IdempotencyService
         Func<CancellationToken, Task<T?>> operation,
         CancellationToken cancellationToken = default)
     {
+        ArgumentNullException.ThrowIfNull(key);
+        ArgumentException.ThrowIfNullOrWhiteSpace(fingerprint);
+        ArgumentNullException.ThrowIfNull(operation);
+
         IdempotencyAcquireResult acquireResult = await _store.TryAcquireAsync(key, fingerprint, cancellationToken);
         switch (acquireResult.Status)
         {
@@ -149,13 +166,11 @@ public sealed class IdempotencyService
 
     private async Task RunLeaseHeartbeatAsync(IdempotencyKey key, Guid ownerToken, CancellationTokenSource leaseLostCts, CancellationToken cancellationToken)
     {
-        TimeSpan interval = TimeSpan.FromTicks(_idempotencyOptions.LeaseDuration.Ticks / 3);
-
         try
         {
             while (true)
             {
-                await Task.Delay(interval, _timeProvider, cancellationToken);
+                await Task.Delay(_heartbeatInterval, _timeProvider, cancellationToken);
 
                 bool renewed = await _store.TryRenewLeaseAsync(key, ownerToken, cancellationToken);
 
