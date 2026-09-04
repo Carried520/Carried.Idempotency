@@ -2,7 +2,7 @@ using System.Text.Json;
 
 namespace Carried.Idempotency.Serialization;
 
-internal class JsonIdempotencySerializer : IIdempotencySerializer
+internal sealed class JsonIdempotencySerializer : IIdempotencySerializer
 {
     public byte[] Serialize<T>(T? value)
     {

@@ -6,14 +6,20 @@ using Carried.Idempotency.Store;
 
 namespace Carried.Idempotency;
 
+/// <summary>
+/// Coordinates execution of idempotent operations, including key acquisition,
+/// result replay, lease renewal, and completion.
+/// </summary>
 public sealed class IdempotencyService
 {
     private readonly IIdempotencyStore _store;
     private readonly IIdempotencySerializer _serializer;
     private readonly TimeProvider _timeProvider;
-
     private readonly TimeSpan _heartbeatInterval;
 
+    /// <summary>
+    /// Initializes a new instance of the <see cref="IdempotencyService"/> class.
+    /// </summary>
     public IdempotencyService(IIdempotencyStore store, IIdempotencySerializer serializer, IdempotencyOptions idempotencyOptions, TimeProvider timeProvider)
     {
         ArgumentNullException.ThrowIfNull(store);
@@ -29,18 +35,51 @@ public sealed class IdempotencyService
         _heartbeatInterval = TimeSpan.FromTicks(idempotencyOptions.LeaseDuration.Ticks / 3);
     }
 
-
+    /// <summary>
+    /// Creates an idempotency service backed by an in-memory store and JSON serialization.
+    /// </summary>
     public static IdempotencyService CreateInMemory(IdempotencyOptions? options = null, TimeProvider? timeProvider = null)
     {
         options ??= new IdempotencyOptions();
         timeProvider ??= TimeProvider.System;
-        
+
         var serializer = new JsonIdempotencySerializer();
         var store = new InMemoryIdempotencyStore(options, timeProvider);
 
         return new IdempotencyService(store, serializer, options, timeProvider);
     }
 
+    /// <summary>
+    /// Executes an operation under the supplied idempotency key.
+    /// </summary>
+    ///
+    /// <remarks>
+    /// If the key is acquired, the operation is executed while the service periodically
+    /// renews its ownership lease. On the successful completion, the result is serialized
+    /// and retained by the configured store for subsequent replay.
+    ///
+    /// If a completed entry already exists with the same fingerprint, its stored result
+    /// is returned without executing the operation again.
+    ///
+    /// Reusing an active retained key with a different fingerprint results in an
+    /// <see cref="IdempotencyConflictException"/>. Attempting to execute while another
+    /// caller currently owns the key results in an
+    /// <see cref="IdempotencyInProgressException"/>.
+    ///
+    /// If ownership of the key is lost before the operation can be completed,
+    /// an <see cref="IdempotencyLeaseLostException"/> is thrown.
+    /// </remarks>
+    /// <exception cref="IdempotencyConflictException">
+    /// Thrown when the idempotency key is already associated with a different operation.
+    /// </exception>
+    ///
+    /// <exception cref="IdempotencyInProgressException">
+    /// Thrown when another operation currently owns the idempotency key.
+    /// </exception>
+    ///
+    /// <exception cref="IdempotencyLeaseLostException">
+    /// Thrown when ownership of the idempotency key is lost before the operation can be completed.
+    /// </exception>
     public async Task<T?> ExecuteAsync<T>(
         IdempotencyKey key,
         string fingerprint,
