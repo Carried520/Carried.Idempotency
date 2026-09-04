@@ -1,4 +1,7 @@
 namespace Carried.Idempotency.AspNet;
 
 [AttributeUsage(AttributeTargets.Class | AttributeTargets.Method, AllowMultiple = false, Inherited = true)]
-public class IdempotencyMetadata : Attribute;
+public sealed class RequireIdempotencyAttribute : IdempotencyMetadata
+{
+    
+}

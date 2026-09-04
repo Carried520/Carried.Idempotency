@@ -21,7 +21,7 @@ internal sealed class IdempotencyTestServer :
     }
 
     public static async Task<IdempotencyTestServer> CreateAsync(
-        Action<IEndpointRouteBuilder> configureEndpoints,
+        Action<IEndpointRouteBuilder>? configureEndpoints = null,
         Action<IServiceCollection>? configureServices = null)
     {
         WebApplicationBuilder builder =
@@ -31,15 +31,21 @@ internal sealed class IdempotencyTestServer :
 
         builder.Services.AddIdempotency();
 
-        configureServices?.Invoke(
-            builder.Services);
+        builder.Services
+            .AddControllers()
+            .AddApplicationPart(
+                typeof(IdempotencyTestServer).Assembly);
+
+        configureServices?.Invoke(builder.Services);
 
         WebApplication app =
             builder.Build();
 
         app.UseIdempotency();
 
-        configureEndpoints(app);
+        app.MapControllers();
+
+        configureEndpoints?.Invoke(app);
 
         await app.StartAsync();
 
@@ -54,7 +60,6 @@ internal sealed class IdempotencyTestServer :
     public async ValueTask DisposeAsync()
     {
         Client.Dispose();
-
         await _app.DisposeAsync();
     }
 }
