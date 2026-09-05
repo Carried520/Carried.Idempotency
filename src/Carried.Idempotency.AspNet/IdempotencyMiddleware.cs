@@ -23,19 +23,20 @@ internal sealed class IdempotencyMiddleware
         _options = options.Value;
     }
 
-    public async Task InvokeAsync(HttpContext context, IdempotencyService idempotencyService, IdempotentResponseExecutor responseExecutor)
+    public async Task InvokeAsync(HttpContext context, IdempotencyService idempotencyService, IdempotentResponseExecutor responseExecutor,
+        IEnumerable<IIdempotencyFingerprintContributor> contributors)
     {
         Endpoint? endpoint = context.GetEndpoint();
 
         var metadata =
             endpoint?.Metadata.GetMetadata<IdempotencyMetadata>();
-        
+
         if (metadata is null)
         {
             await _next(context);
             return;
         }
-        
+
         IdempotencyPolicy policy =
             metadata.PolicyName is null
                 ? _options.DefaultPolicy
@@ -93,11 +94,12 @@ internal sealed class IdempotencyMiddleware
         string fingerprint =
             await RequestFingerprintProvider.CreateAsync(
                 context,
-                routePattern);
+                routePattern,
+                contributors,
+                context.RequestAborted);
 
         try
         {
-
             await responseExecutor.ExecuteAsync(
                 context,
                 idempotencyService,
