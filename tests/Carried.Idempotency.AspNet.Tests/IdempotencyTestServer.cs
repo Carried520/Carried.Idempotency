@@ -64,17 +64,15 @@ internal sealed class IdempotencyTestServer :
 
         await app.StartAsync();
 
-        HttpClient client =
-            app.GetTestClient();
-
         return new IdempotencyTestServer(
             app,
-            client);
+            app.GetTestClient());
     }
 
     public async ValueTask DisposeAsync()
     {
         Client.Dispose();
+
         await _app.DisposeAsync();
     }
 }

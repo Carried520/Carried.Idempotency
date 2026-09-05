@@ -1,4 +1,3 @@
-using Carried.Idempotency.AspNet.Fingerprinting;
 using Carried.Idempotency.AspNet.Options;
 using Carried.Idempotency.AspNet.Responses;
 using Carried.Idempotency.Options;
@@ -19,7 +18,10 @@ public static class IdempotencyServiceCollectionExtensions
 
             var idempotencyService = IdempotencyService.CreateInMemory(options);
 
-            services.AddOptions<IdempotencyAspNetOptions>();
+            services.AddOptions<IdempotencyAspNetOptions>()
+                .Validate(aspNetOptions => !string.IsNullOrWhiteSpace(aspNetOptions.HeaderName) , "HeaderName is required.")
+                .Validate(aspNetOptions => aspNetOptions.MaxKeyLength > 0, "MaxKeyLength must be greater than zero.")
+                .ValidateOnStart();
             
             if (configureAspNetOptions is not null)
             {

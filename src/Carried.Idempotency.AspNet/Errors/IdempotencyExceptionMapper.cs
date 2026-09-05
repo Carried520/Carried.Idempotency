@@ -1,7 +1,7 @@
 using Carried.Idempotency.Exceptions;
 using Microsoft.AspNetCore.Http;
 
-namespace Carried.Idempotency.AspNet;
+namespace Carried.Idempotency.AspNet.Errors;
 
 internal static class IdempotencyExceptionMapper
 {

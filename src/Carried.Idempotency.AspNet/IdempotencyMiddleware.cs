@@ -1,9 +1,12 @@
-﻿using Carried.Idempotency.AspNet.Fingerprinting;
+﻿using Carried.Idempotency.AspNet.Errors;
+using Carried.Idempotency.AspNet.Fingerprinting;
 using Carried.Idempotency.AspNet.Metadata;
+using Carried.Idempotency.AspNet.Options;
 using Carried.Idempotency.AspNet.Responses;
 using Carried.Idempotency.Exceptions;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Routing;
+using Microsoft.Extensions.Options;
 using Microsoft.Extensions.Primitives;
 
 namespace Carried.Idempotency.AspNet;
@@ -11,10 +14,12 @@ namespace Carried.Idempotency.AspNet;
 internal sealed class IdempotencyMiddleware
 {
     private readonly RequestDelegate _next;
+    private readonly IdempotencyAspNetOptions _options;
 
-    public IdempotencyMiddleware(RequestDelegate next)
+    public IdempotencyMiddleware(RequestDelegate next, IOptions<IdempotencyAspNetOptions> options)
     {
         _next = next;
+        _options = options.Value;
     }
 
     public async Task InvokeAsync(HttpContext context, IdempotencyService idempotencyService, IdempotentResponseExecutor responseExecutor)
@@ -31,16 +36,16 @@ internal sealed class IdempotencyMiddleware
         }
 
         if (!context.Request.Headers.TryGetValue(
-                "Idempotency-Key",
+                _options.HeaderName,
                 out StringValues values) ||
             values.Count != 1 ||
-            string.IsNullOrWhiteSpace(values[0]))
+            string.IsNullOrWhiteSpace(values[0]) || values[0]!.Length > _options.MaxKeyLength)
         {
             context.Response.StatusCode =
                 StatusCodes.Status400BadRequest;
 
             await context.Response.WriteAsync(
-                "Missing or invalid Idempotency-Key header.");
+                $"Missing or invalid {_options.HeaderName} header.");
 
             return;
         }
