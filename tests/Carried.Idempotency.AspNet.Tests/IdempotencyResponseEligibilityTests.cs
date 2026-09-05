@@ -12,18 +12,18 @@ public sealed class IdempotencyResponseEligibilityTests
     [Fact]
     public async Task InternalServerError_IsNotRetained()
     {
-        int executionCount = 0;
+        var executionCount = 0;
 
         await using WebApplication app = await CreateAppAsync(app =>
         {
             app.MapPost("/test", () =>
-            {
-                executionCount++;
+                {
+                    executionCount++;
 
-                return Results.StatusCode(
-                    StatusCodes.Status500InternalServerError);
-            })
-            .RequireIdempotency();
+                    return Results.StatusCode(
+                        StatusCodes.Status500InternalServerError);
+                })
+                .RequireIdempotency();
         });
 
         HttpClient client = app.GetTestClient();
@@ -48,18 +48,18 @@ public sealed class IdempotencyResponseEligibilityTests
     [Fact]
     public async Task TooManyRequests_IsNotRetained()
     {
-        int executionCount = 0;
+        var executionCount = 0;
 
         await using WebApplication app = await CreateAppAsync(app =>
         {
             app.MapPost("/test", () =>
-            {
-                executionCount++;
+                {
+                    executionCount++;
 
-                return Results.StatusCode(
-                    StatusCodes.Status429TooManyRequests);
-            })
-            .RequireIdempotency();
+                    return Results.StatusCode(
+                        StatusCodes.Status429TooManyRequests);
+                })
+                .RequireIdempotency();
         });
 
         HttpClient client = app.GetTestClient();
@@ -84,18 +84,18 @@ public sealed class IdempotencyResponseEligibilityTests
     [Fact]
     public async Task RequestTimeout_IsNotRetained()
     {
-        int executionCount = 0;
+        var executionCount = 0;
 
         await using WebApplication app = await CreateAppAsync(app =>
         {
             app.MapPost("/test", () =>
-            {
-                executionCount++;
+                {
+                    executionCount++;
 
-                return Results.StatusCode(
-                    StatusCodes.Status408RequestTimeout);
-            })
-            .RequireIdempotency();
+                    return Results.StatusCode(
+                        StatusCodes.Status408RequestTimeout);
+                })
+                .RequireIdempotency();
         });
 
         HttpClient client = app.GetTestClient();
@@ -125,12 +125,12 @@ public sealed class IdempotencyResponseEligibilityTests
         await using WebApplication app = await CreateAppAsync(app =>
         {
             app.MapPost("/test", () =>
-            {
-                executionCount++;
+                {
+                    executionCount++;
 
-                return Results.BadRequest();
-            })
-            .RequireIdempotency();
+                    return Results.BadRequest();
+                })
+                .RequireIdempotency();
         });
 
         HttpClient client = app.GetTestClient();
@@ -161,17 +161,14 @@ public sealed class IdempotencyResponseEligibilityTests
             app =>
             {
                 app.MapPost("/test", () =>
-                {
-                    executionCount++;
+                    {
+                        executionCount++;
 
-                    return Results.BadRequest();
-                })
-                .RequireIdempotency();
+                        return Results.BadRequest();
+                    })
+                    .RequireIdempotency();
             },
-            options =>
-            {
-                options.StoreClientErrors = false;
-            });
+            options => { options.StoreClientErrors = false; });
 
         HttpClient client = app.GetTestClient();
 
@@ -189,6 +186,110 @@ public sealed class IdempotencyResponseEligibilityTests
             HttpStatusCode.BadRequest,
             secondResponse.StatusCode);
 
+        Assert.Equal(2, executionCount);
+    }
+
+    [Fact]
+    public async Task ResponseAtMaximumRetainedSize_IsRetained()
+    {
+        int executionCount = 0;
+
+        const string responseBody = "12345678";
+
+        await using IdempotencyTestServer server =
+            await IdempotencyTestServer.CreateAsync(
+                configureEndpoints: endpoints =>
+                {
+                    endpoints.MapPost("/test", () =>
+                        {
+                            executionCount++;
+
+                            return Results.Text(responseBody);
+                        })
+                        .RequireIdempotency();
+                },
+                configureAspNetOptions: options =>
+                {
+                    options.MaxRetainedResponseBodySize =
+                        responseBody.Length;
+                });
+
+        using var firstRequest =
+            new HttpRequestMessage(
+                HttpMethod.Post,
+                "/test");
+
+        firstRequest.Headers.Add(
+            "Idempotency-Key",
+            "test-key");
+
+        using HttpResponseMessage firstResponse =
+            await server.Client.SendAsync(firstRequest);
+
+        using var secondRequest =
+            new HttpRequestMessage(
+                HttpMethod.Post,
+                "/test");
+
+        secondRequest.Headers.Add(
+            "Idempotency-Key",
+            "test-key");
+
+        using HttpResponseMessage secondResponse =
+            await server.Client.SendAsync(secondRequest);
+
+        Assert.Equal(responseBody, await firstResponse.Content.ReadAsStringAsync());
+        Assert.Equal(responseBody, await secondResponse.Content.ReadAsStringAsync());
+        Assert.Equal(1, executionCount);
+    }
+
+    [Fact]
+    public async Task ResponseOverMaximumRetainedSize_IsNotRetained()
+    {
+        int executionCount = 0;
+
+        const string responseBody = "123456789";
+
+        await using IdempotencyTestServer server =
+            await IdempotencyTestServer.CreateAsync(
+                configureEndpoints: endpoints =>
+                {
+                    endpoints.MapPost("/test", () =>
+                        {
+                            executionCount++;
+
+                            return Results.Text(responseBody);
+                        })
+                        .RequireIdempotency();
+                },
+                configureAspNetOptions: options => { options.MaxRetainedResponseBodySize = 8; });
+
+        using var firstRequest =
+            new HttpRequestMessage(
+                HttpMethod.Post,
+                "/test");
+
+        firstRequest.Headers.Add(
+            "Idempotency-Key",
+            "test-key");
+
+        using HttpResponseMessage firstResponse =
+            await server.Client.SendAsync(firstRequest);
+
+        using var secondRequest =
+            new HttpRequestMessage(
+                HttpMethod.Post,
+                "/test");
+
+        secondRequest.Headers.Add(
+            "Idempotency-Key",
+            "test-key");
+
+        using HttpResponseMessage secondResponse =
+            await server.Client.SendAsync(secondRequest);
+
+        Assert.Equal(responseBody, await firstResponse.Content.ReadAsStringAsync());
+        Assert.Equal(responseBody, await secondResponse.Content.ReadAsStringAsync());
         Assert.Equal(2, executionCount);
     }
 
