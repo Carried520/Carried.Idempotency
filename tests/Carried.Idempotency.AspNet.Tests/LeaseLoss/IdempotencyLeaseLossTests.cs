@@ -1,13 +1,14 @@
 using System.Net;
 using System.Text;
 using Carried.Idempotency.AspNet.Extensions;
+using Carried.Idempotency.AspNet.Tests.TestServer;
 using Carried.Idempotency.Options;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 
-namespace Carried.Idempotency.AspNet.Tests;
+namespace Carried.Idempotency.AspNet.Tests.LeaseLoss;
 
 public partial class IdempotencyIntegrationTests
 {
@@ -79,7 +80,7 @@ public partial class IdempotencyIntegrationTests
                 });
 
         Task<HttpResponseMessage> request =
-            SendAsync(
+            BaseIntegration.IdempotencyIntegrationTests.SendAsync(
                 server.Client,
                 "/orders",
                 "lease-loss-key",
@@ -162,7 +163,7 @@ public partial class IdempotencyIntegrationTests
                 });
 
         Task<HttpResponseMessage> request =
-            SendAsync(
+            BaseIntegration.IdempotencyIntegrationTests.SendAsync(
                 server.Client,
                 "/orders",
                 "lease-loss-key",

@@ -7,7 +7,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 
-namespace Carried.Idempotency.AspNet.Tests;
+namespace Carried.Idempotency.AspNet.Tests.Observability;
 
 public sealed class IdempotencyEventLoggerTests
 {

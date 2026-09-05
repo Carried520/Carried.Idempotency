@@ -1,11 +1,12 @@
 using System.Net;
 using Carried.Idempotency.AspNet.Extensions;
 using Carried.Idempotency.AspNet.Options;
+using Carried.Idempotency.AspNet.Tests.TestServer;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.TestHost;
 
-namespace Carried.Idempotency.AspNet.Tests;
+namespace Carried.Idempotency.AspNet.Tests.ResponseEligibility;
 
 public sealed class IdempotencyResponseEligibilityTests
 {

@@ -3,6 +3,7 @@ using System.Net.Http.Json;
 using System.Text.Json;
 using Carried.Idempotency.AspNet.Errors;
 using Carried.Idempotency.AspNet.Extensions;
+using Carried.Idempotency.AspNet.Tests.TestServer;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;

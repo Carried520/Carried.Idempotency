@@ -1,4 +1,5 @@
 using Carried.Idempotency.AspNet.Extensions;
+using Carried.Idempotency.AspNet.Tests.TestServer;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
 using Xunit;
