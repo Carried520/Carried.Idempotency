@@ -73,7 +73,10 @@ internal sealed class IdempotentResponseExecutor
                         headers,
                         body);
 
-                    return ShouldStoreResponse(idempotentHttpResponse.StatusCode)
+                    bool shouldStore = ShouldStoreResponse(idempotentHttpResponse) &&
+                                       idempotentHttpResponse.Body.Length <= _options.MaxRetainedResponseBodySize;
+
+                    return shouldStore
                         ? IdempotencyOperationResult<IdempotentHttpResponse>.Complete(idempotentHttpResponse)
                         : IdempotencyOperationResult<IdempotentHttpResponse>.Release(idempotentHttpResponse);
                 },
@@ -106,13 +109,18 @@ internal sealed class IdempotentResponseExecutor
             context.RequestAborted);
     }
 
-    private bool ShouldStoreResponse(int statusCode) =>
-        statusCode switch
+    private bool ShouldStoreResponse(IdempotentHttpResponse response)
+    {
+        if (response.Body.LongLength > _options.MaxRetainedResponseBodySize)
+            return false;
+
+        return response.StatusCode switch
         {
             >= 200 and < 400 => true,
             408 or 429 => false,
             >= 400 and < 500 => _options.StoreClientErrors,
             >= 500 and < 600 => false,
-            _ => throw new ArgumentOutOfRangeException(nameof(statusCode))
+            _ => throw new ArgumentOutOfRangeException(nameof(response))
         };
+    }
 }

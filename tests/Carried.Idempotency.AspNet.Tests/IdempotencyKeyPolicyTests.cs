@@ -11,9 +11,9 @@ public sealed class IdempotencyKeyPolicyTests
     [Fact]
     public async Task CustomHeaderName_IsAccepted()
     {
-        int executionCount = 0;
+        var executionCount = 0;
 
-        await using IdempotencyTestServer server =
+        await using var server =
             await IdempotencyTestServer.CreateAsync(
                 configureEndpoints: endpoints =>
                 {

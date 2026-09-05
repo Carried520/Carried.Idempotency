@@ -19,10 +19,11 @@ public static class IdempotencyServiceCollectionExtensions
             var idempotencyService = IdempotencyService.CreateInMemory(options);
 
             services.AddOptions<IdempotencyAspNetOptions>()
-                .Validate(aspNetOptions => !string.IsNullOrWhiteSpace(aspNetOptions.HeaderName) , "HeaderName is required.")
+                .Validate(aspNetOptions => !string.IsNullOrWhiteSpace(aspNetOptions.HeaderName), "HeaderName is required.")
                 .Validate(aspNetOptions => aspNetOptions.MaxKeyLength > 0, "MaxKeyLength must be greater than zero.")
+                .Validate(aspNetOptions => aspNetOptions.MaxRetainedResponseBodySize > 0, "MaxRetainedResponseBodySize must be greater than zero.")
                 .ValidateOnStart();
-            
+
             if (configureAspNetOptions is not null)
             {
                 services.Configure(configureAspNetOptions);
