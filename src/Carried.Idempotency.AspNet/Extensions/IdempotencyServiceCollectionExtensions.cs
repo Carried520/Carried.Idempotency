@@ -1,11 +1,13 @@
 using Carried.Idempotency.AspNet.Errors;
 using Carried.Idempotency.AspNet.Fingerprinting;
+using Carried.Idempotency.AspNet.Observability;
 using Carried.Idempotency.AspNet.Options;
 using Carried.Idempotency.AspNet.Responses;
 using Carried.Idempotency.AspNet.Validation;
 using Carried.Idempotency.Options;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
+using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Options;
 
 namespace Carried.Idempotency.AspNet.Extensions;
@@ -34,6 +36,9 @@ public static class IdempotencyServiceCollectionExtensions
 
             services.TryAddSingleton(idempotencyService);
             services.TryAddSingleton<IdempotentResponseExecutor>();
+
+            services.TryAddEnumerable(
+                ServiceDescriptor.Singleton<IHostedService, IdempotencyEventLogger>());
 
             services.AddProblemDetails();
             services.TryAddSingleton<IIdempotencyErrorResponseWriter, IdempotencyErrorResponseWriter>();
