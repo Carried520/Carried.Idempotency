@@ -1,11 +1,21 @@
+using Carried.Idempotency.AspNet.Options;
+using Carried.Idempotency.IdempotencyOperation;
 using Microsoft.AspNetCore.Http;
+using Microsoft.Extensions.Options;
 using Microsoft.Extensions.Primitives;
 
-namespace Carried.Idempotency.AspNet;
+namespace Carried.Idempotency.AspNet.Responses;
 
-public sealed class IdempotentResponseExecutor
+internal sealed class IdempotentResponseExecutor
 {
-    public async Task ExecuteAsync(
+    private readonly IdempotencyAspNetOptions _options;
+
+    public IdempotentResponseExecutor(IOptions<IdempotencyAspNetOptions> options)
+    {
+        _options = options.Value;
+    }
+
+    internal async Task ExecuteAsync(
         HttpContext context,
         IdempotencyService idempotencyService,
         IdempotencyKey key,
@@ -57,11 +67,15 @@ public sealed class IdempotentResponseExecutor
                         headers[header.Key] = header.Value.OfType<string>().ToArray();
                     }
 
-                    return new IdempotentHttpResponse(
+                    var idempotentHttpResponse = new IdempotentHttpResponse(
                         context.Response.StatusCode,
                         context.Response.ContentType,
                         headers,
                         body);
+
+                    return ShouldStoreResponse(idempotentHttpResponse.StatusCode)
+                        ? IdempotencyOperationResult<IdempotentHttpResponse>.Complete(idempotentHttpResponse)
+                        : IdempotencyOperationResult<IdempotentHttpResponse>.Release(idempotentHttpResponse);
                 },
                 context.RequestAborted);
         }
@@ -91,4 +105,14 @@ public sealed class IdempotentResponseExecutor
             response.Body,
             context.RequestAborted);
     }
+
+    private bool ShouldStoreResponse(int statusCode) =>
+        statusCode switch
+        {
+            >= 200 and < 400 => true,
+            408 or 429 => false,
+            >= 400 and < 500 => _options.StoreClientErrors,
+            >= 500 and < 600 => false,
+            _ => throw new ArgumentOutOfRangeException(nameof(statusCode))
+        };
 }

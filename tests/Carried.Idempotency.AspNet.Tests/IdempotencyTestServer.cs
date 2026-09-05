@@ -1,4 +1,5 @@
 using Carried.Idempotency.AspNet.Extensions;
+using Carried.Idempotency.AspNet.Options;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Routing;
 using Microsoft.AspNetCore.TestHost;
@@ -24,6 +25,7 @@ internal sealed class IdempotencyTestServer :
     public static async Task<IdempotencyTestServer> CreateAsync(
         Action<IEndpointRouteBuilder>? configureEndpoints = null,
         Action<IServiceCollection>? configureServices = null,
+        Action<IdempotencyAspNetOptions>? configureAspNetOptions = null,
         bool enableOpenApi = false)
     {
         WebApplicationBuilder builder =
@@ -31,7 +33,8 @@ internal sealed class IdempotencyTestServer :
 
         builder.WebHost.UseTestServer();
 
-        builder.Services.AddIdempotency();
+        builder.Services.AddIdempotency(
+            configureAspNetOptions: configureAspNetOptions);
 
         builder.Services
             .AddControllers()
