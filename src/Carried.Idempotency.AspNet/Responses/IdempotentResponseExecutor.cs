@@ -61,7 +61,7 @@ internal sealed class IdempotentResponseExecutor
                         StringComparer.OrdinalIgnoreCase);
                     foreach (KeyValuePair<string, StringValues> header in context.Response.Headers)
                     {
-                        if (!IdempotencyReplayHeaders.Allowed.Contains(header.Key))
+                        if (!_options.ReplayHeaders.Contains(header.Key))
                             continue;
 
                         headers[header.Key] = header.Value.OfType<string>().ToArray();
