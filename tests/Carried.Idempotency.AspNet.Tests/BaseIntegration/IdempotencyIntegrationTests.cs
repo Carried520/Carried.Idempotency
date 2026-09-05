@@ -1,10 +1,11 @@
 ﻿using System.Net;
 using System.Text;
 using Carried.Idempotency.AspNet.Extensions;
+using Carried.Idempotency.AspNet.Tests.TestServer;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
 
-namespace Carried.Idempotency.AspNet.Tests;
+namespace Carried.Idempotency.AspNet.Tests.BaseIntegration;
 
 public sealed partial class IdempotencyIntegrationTests
 {
@@ -389,7 +390,7 @@ public sealed partial class IdempotencyIntegrationTests
         Assert.Equal(1, invocationCount);
     }
 
-    private static async Task<HttpResponseMessage> SendAsync(
+    internal static async Task<HttpResponseMessage> SendAsync(
         HttpClient client,
         string uri,
         string idempotencyKey,
