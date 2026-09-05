@@ -120,7 +120,7 @@ public sealed class IdempotencyResponseEligibilityTests
     [Fact]
     public async Task ClientError_IsRetainedByDefault()
     {
-        int executionCount = 0;
+        var executionCount = 0;
 
         await using WebApplication app = await CreateAppAsync(app =>
         {
@@ -168,7 +168,7 @@ public sealed class IdempotencyResponseEligibilityTests
                     })
                     .RequireIdempotency();
             },
-            options => { options.StoreClientErrors = false; });
+            options => { options.DefaultPolicy.StoreClientErrors = false; });
 
         HttpClient client = app.GetTestClient();
 
@@ -192,11 +192,11 @@ public sealed class IdempotencyResponseEligibilityTests
     [Fact]
     public async Task ResponseAtMaximumRetainedSize_IsRetained()
     {
-        int executionCount = 0;
+        var executionCount = 0;
 
         const string responseBody = "12345678";
 
-        await using IdempotencyTestServer server =
+        await using var server =
             await IdempotencyTestServer.CreateAsync(
                 configureEndpoints: endpoints =>
                 {
@@ -210,7 +210,7 @@ public sealed class IdempotencyResponseEligibilityTests
                 },
                 configureAspNetOptions: options =>
                 {
-                    options.MaxRetainedResponseBodySize =
+                    options.DefaultPolicy.MaxRetainedResponseBodySize =
                         responseBody.Length;
                 });
 
@@ -246,11 +246,11 @@ public sealed class IdempotencyResponseEligibilityTests
     [Fact]
     public async Task ResponseOverMaximumRetainedSize_IsNotRetained()
     {
-        int executionCount = 0;
+        var executionCount = 0;
 
         const string responseBody = "123456789";
 
-        await using IdempotencyTestServer server =
+        await using var server =
             await IdempotencyTestServer.CreateAsync(
                 configureEndpoints: endpoints =>
                 {
@@ -262,7 +262,7 @@ public sealed class IdempotencyResponseEligibilityTests
                         })
                         .RequireIdempotency();
                 },
-                configureAspNetOptions: options => { options.MaxRetainedResponseBodySize = 8; });
+                configureAspNetOptions: options => { options.DefaultPolicy.MaxRetainedResponseBodySize = 8; });
 
         using var firstRequest =
             new HttpRequestMessage(

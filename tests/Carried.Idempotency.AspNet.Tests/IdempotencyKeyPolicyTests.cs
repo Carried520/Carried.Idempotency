@@ -68,7 +68,7 @@ public sealed class IdempotencyKeyPolicyTests
     [Fact]
     public async Task DefaultHeaderName_IsRejected_WhenCustomHeaderNameIsConfigured()
     {
-        await using IdempotencyTestServer server =
+        await using var server =
             await IdempotencyTestServer.CreateAsync(
                 configureEndpoints: endpoints =>
                 {
@@ -105,7 +105,7 @@ public sealed class IdempotencyKeyPolicyTests
         const int maxKeyLength = 8;
         string key = new('a', maxKeyLength);
 
-        await using IdempotencyTestServer server =
+        await using var server =
             await IdempotencyTestServer.CreateAsync(
                 configureEndpoints: endpoints =>
                 {
@@ -116,7 +116,7 @@ public sealed class IdempotencyKeyPolicyTests
                 },
                 configureAspNetOptions: options =>
                 {
-                    options.MaxKeyLength = maxKeyLength;
+                    options.DefaultPolicy.MaxKeyLength =  maxKeyLength;
                 });
 
         using var request =
@@ -142,7 +142,7 @@ public sealed class IdempotencyKeyPolicyTests
         const int maxKeyLength = 8;
         string key = new('a', maxKeyLength + 1);
 
-        await using IdempotencyTestServer server =
+        await using var server =
             await IdempotencyTestServer.CreateAsync(
                 configureEndpoints: endpoints =>
                 {
@@ -153,7 +153,7 @@ public sealed class IdempotencyKeyPolicyTests
                 },
                 configureAspNetOptions: options =>
                 {
-                    options.MaxKeyLength = maxKeyLength;
+                    options.DefaultPolicy.MaxKeyLength = maxKeyLength;
                 });
 
         using var request =
@@ -179,7 +179,7 @@ public sealed class IdempotencyKeyPolicyTests
         await Assert.ThrowsAsync<OptionsValidationException>(
             async () =>
             {
-                await using IdempotencyTestServer server =
+                await using var server =
                     await IdempotencyTestServer.CreateAsync(
                         configureAspNetOptions: options =>
                         {
@@ -194,11 +194,11 @@ public sealed class IdempotencyKeyPolicyTests
         await Assert.ThrowsAsync<OptionsValidationException>(
             async () =>
             {
-                await using IdempotencyTestServer server =
+                await using var server =
                     await IdempotencyTestServer.CreateAsync(
                         configureAspNetOptions: options =>
                         {
-                            options.MaxKeyLength = 0;
+                            options.DefaultPolicy.MaxKeyLength = 0;
                         });
             });
     }

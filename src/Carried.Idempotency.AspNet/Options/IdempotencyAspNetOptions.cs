@@ -1,12 +1,25 @@
-using Carried.Idempotency.AspNet.Responses;
+using Carried.Idempotency.AspNet.Policies;
 
 namespace Carried.Idempotency.AspNet.Options;
 
 public sealed class IdempotencyAspNetOptions
 {
-    public bool StoreClientErrors { get; set; } = true;
     public string HeaderName { get; set; } = "Idempotency-Key";
-    public int MaxKeyLength { get; set; } = 255;
-    public long MaxRetainedResponseBodySize { get; set; } = 1024 * 1024;
-    public ISet<string> ReplayHeaders { get; } = new HashSet<string>(IdempotencyReplayHeaders.Allowed, StringComparer.OrdinalIgnoreCase);
+    public IdempotencyPolicy DefaultPolicy { get; } = new();
+    public IDictionary<string, IdempotencyPolicy> Policies { get; } = new Dictionary<string, IdempotencyPolicy>(StringComparer.OrdinalIgnoreCase);
+
+    public void AddPolicy(string name, Action<IdempotencyPolicy> configure)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(name);
+        ArgumentNullException.ThrowIfNull(configure);
+
+        var policy = new IdempotencyPolicy();
+        
+        configure(policy);
+
+        if (!Policies.TryAdd(name, policy))
+        {
+            throw new InvalidOperationException($"The policy '{name}' is already configured.");
+        }
+    }
 }
