@@ -1,3 +1,4 @@
+using Carried.Idempotency.AspNet.Errors;
 using Carried.Idempotency.AspNet.Fingerprinting;
 using Carried.Idempotency.AspNet.Options;
 using Carried.Idempotency.AspNet.Responses;
@@ -33,6 +34,9 @@ public static class IdempotencyServiceCollectionExtensions
 
             services.TryAddSingleton(idempotencyService);
             services.TryAddSingleton<IdempotentResponseExecutor>();
+
+            services.AddProblemDetails();
+            services.TryAddSingleton<IIdempotencyErrorResponseWriter, IdempotencyErrorResponseWriter>();
 
             return services;
         }

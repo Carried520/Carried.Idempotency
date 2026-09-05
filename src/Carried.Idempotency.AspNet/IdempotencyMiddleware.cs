@@ -24,7 +24,7 @@ internal sealed class IdempotencyMiddleware
     }
 
     public async Task InvokeAsync(HttpContext context, IdempotencyService idempotencyService, IdempotentResponseExecutor responseExecutor,
-        IEnumerable<IIdempotencyFingerprintContributor> contributors)
+        IEnumerable<IIdempotencyFingerprintContributor> contributors, IIdempotencyErrorResponseWriter idempotencyErrorResponseWriter)
     {
         Endpoint? endpoint = context.GetEndpoint();
 
@@ -48,22 +48,25 @@ internal sealed class IdempotencyMiddleware
             values.Count != 1 ||
             string.IsNullOrWhiteSpace(values[0]) || values[0]!.Length > policy.MaxKeyLength)
         {
-            context.Response.StatusCode =
-                StatusCodes.Status400BadRequest;
-
-            await context.Response.WriteAsync(
-                $"Missing or invalid {_options.HeaderName} header.");
-
+            await idempotencyErrorResponseWriter.WriteAsync(
+                context,
+                new IdempotencyError(
+                    StatusCodes.Status400BadRequest,
+                    "invalid_idempotency_key",
+                    $"Missing or invalid {_options.HeaderName} header."),
+                CancellationToken.None);
             return;
         }
 
         if (endpoint is not RouteEndpoint routeEndpoint)
         {
-            context.Response.StatusCode =
-                StatusCodes.Status500InternalServerError;
-
-            await context.Response.WriteAsync(
-                "Idempotency requires a route endpoint.");
+            await idempotencyErrorResponseWriter.WriteAsync(
+                context,
+                new IdempotencyError(
+                    StatusCodes.Status500InternalServerError,
+                    "idempotency_route_endpoint_required",
+                    "Idempotency requires a route endpoint."),
+                CancellationToken.None);
 
             return;
         }
@@ -73,11 +76,13 @@ internal sealed class IdempotencyMiddleware
 
         if (string.IsNullOrWhiteSpace(routePattern))
         {
-            context.Response.StatusCode =
-                StatusCodes.Status500InternalServerError;
-
-            await context.Response.WriteAsync(
-                "Idempotency requires a route pattern.");
+            await idempotencyErrorResponseWriter.WriteAsync(
+                context,
+                new IdempotencyError(
+                    StatusCodes.Status500InternalServerError,
+                    "idempotency_route_pattern_required",
+                    "Idempotency requires a route pattern."),
+                CancellationToken.None);
 
             return;
         }
@@ -110,13 +115,8 @@ internal sealed class IdempotencyMiddleware
         }
         catch (Exception exception) when (exception is IdempotencyConflictException or IdempotencyInProgressException or IdempotencyLeaseLostException)
         {
-            context.Response.StatusCode = IdempotencyExceptionMapper.GetStatusCode(exception);
-
-            await context.Response.WriteAsJsonAsync(new
-            {
-                error = IdempotencyExceptionMapper.GetErrorCode(exception),
-                errorDescription = exception.Message,
-            });
+            IdempotencyError idempotencyError = IdempotencyExceptionMapper.Map(exception);
+            await idempotencyErrorResponseWriter.WriteAsync(context, idempotencyError, CancellationToken.None);
         }
     }
 
