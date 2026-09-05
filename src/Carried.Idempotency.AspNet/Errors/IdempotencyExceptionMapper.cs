@@ -5,25 +5,13 @@ namespace Carried.Idempotency.AspNet.Errors;
 
 internal static class IdempotencyExceptionMapper
 {
-    public static int GetStatusCode(Exception exception)
+    internal static IdempotencyError Map(Exception exception)
     {
         return exception switch
         {
-            IdempotencyConflictException => StatusCodes.Status409Conflict,
-            IdempotencyInProgressException => StatusCodes.Status409Conflict,
-            IdempotencyLeaseLostException => StatusCodes.Status409Conflict,
-            _ => throw new ArgumentOutOfRangeException(nameof(exception), exception, "Unsupported idempotency exception.")
-        };
-    }
-
-
-    public static string GetErrorCode(Exception exception)
-    {
-        return exception switch
-        {
-            IdempotencyConflictException => "idempotency_conflict",
-            IdempotencyInProgressException => "idempotency_in_progress",
-            IdempotencyLeaseLostException => "idempotency_lease_lost",
+            IdempotencyConflictException => new IdempotencyError(StatusCodes.Status409Conflict, "idempotency_conflict", exception.Message),
+            IdempotencyInProgressException => new IdempotencyError(StatusCodes.Status409Conflict, "idempotency_in_progress", exception.Message),
+            IdempotencyLeaseLostException => new IdempotencyError(StatusCodes.Status409Conflict, "idempotency_lease_lost", exception.Message),
             _ => throw new ArgumentOutOfRangeException(nameof(exception), exception, "Unsupported idempotency exception.")
         };
     }
