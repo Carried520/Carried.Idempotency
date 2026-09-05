@@ -51,6 +51,22 @@ public static class IdempotencyServiceCollectionExtensions
             return services;
         }
 
+        public IServiceCollection AddIdempotencyMetrics()
+        {
+            services.TryAddSingleton<IdempotencyMetrics>();
+
+            services.TryAddSingleton<IIdempotencyMetricsRecorder>(
+                static provider =>
+                    provider.GetRequiredService<IdempotencyMetrics>());
+
+            services.TryAddEnumerable(
+                ServiceDescriptor.Singleton<
+                    IHostedService,
+                    IdempotencyMetricsHostedService>());
+
+            return services;
+        }
+
         public IServiceCollection AddIdempotencyFingerprintContributor<T>() where T : class, IIdempotencyFingerprintContributor
         {
             services.TryAddEnumerable(ServiceDescriptor.Singleton<IIdempotencyFingerprintContributor, T>());

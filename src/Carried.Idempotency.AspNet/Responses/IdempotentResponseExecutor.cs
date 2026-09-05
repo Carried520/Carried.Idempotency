@@ -1,3 +1,4 @@
+using Carried.Idempotency.AspNet.Observability;
 using Carried.Idempotency.AspNet.Policies;
 using Carried.Idempotency.IdempotencyOperation;
 using Microsoft.AspNetCore.Http;
@@ -7,6 +8,13 @@ namespace Carried.Idempotency.AspNet.Responses;
 
 internal sealed class IdempotentResponseExecutor
 {
+    private readonly IIdempotencyMetricsRecorder? _metrics;
+
+    public IdempotentResponseExecutor(IIdempotencyMetricsRecorder? metrics = null)
+    {
+        _metrics = metrics;
+    }
+
     internal async Task ExecuteAsync(
         HttpContext context,
         IdempotencyService idempotencyService,
@@ -52,25 +60,37 @@ internal sealed class IdempotentResponseExecutor
 
                     var headers = new Dictionary<string, string[]>(
                         StringComparer.OrdinalIgnoreCase);
-                    foreach (KeyValuePair<string, StringValues> header in context.Response.Headers)
+
+                    foreach (KeyValuePair<string, StringValues> header
+                             in context.Response.Headers)
                     {
                         if (!policy.ReplayHeaders.Contains(header.Key))
                             continue;
 
-                        headers[header.Key] = header.Value.OfType<string>().ToArray();
+                        headers[header.Key] =
+                            header.Value.OfType<string>().ToArray();
                     }
 
-                    var idempotentHttpResponse = new IdempotentHttpResponse(
-                        context.Response.StatusCode,
-                        context.Response.ContentType,
-                        headers,
-                        body);
+                    var idempotentHttpResponse =
+                        new IdempotentHttpResponse(
+                            context.Response.StatusCode,
+                            context.Response.ContentType,
+                            headers,
+                            body);
 
-                    bool shouldStore = ShouldStoreResponse(idempotentHttpResponse, policy);
+                    ResponseRetentionResult retentionResult =
+                        GetRetentionResult(
+                            idempotentHttpResponse,
+                            policy);
 
-                    return shouldStore
-                        ? IdempotencyOperationResult<IdempotentHttpResponse>.Complete(idempotentHttpResponse)
-                        : IdempotencyOperationResult<IdempotentHttpResponse>.Release(idempotentHttpResponse);
+                    _metrics?.RecordResponse(
+                        retentionResult.MetricResult);
+
+                    return retentionResult.ShouldStore
+                        ? IdempotencyOperationResult<IdempotentHttpResponse>
+                            .Complete(idempotentHttpResponse)
+                        : IdempotencyOperationResult<IdempotentHttpResponse>
+                            .Release(idempotentHttpResponse);
                 },
                 context.RequestAborted);
         }
@@ -101,18 +121,54 @@ internal sealed class IdempotentResponseExecutor
             context.RequestAborted);
     }
 
-    private static bool ShouldStoreResponse(IdempotentHttpResponse response, IdempotencyPolicy policy)
+    private static ResponseRetentionResult GetRetentionResult(
+        IdempotentHttpResponse response,
+        IdempotencyPolicy policy)
     {
-        if (response.Body.LongLength > policy.MaxRetainedResponseBodySize)
-            return false;
+        string? rejectionReason =
+            response.StatusCode switch
+            {
+                >= 200 and < 400 => null,
 
-        return response.StatusCode switch
+                408 =>
+                    IdempotencyMetricResults.RequestTimeout,
+
+                429 =>
+                    IdempotencyMetricResults.RateLimited,
+
+                >= 400 and < 500 when !policy.StoreClientErrors =>
+                    IdempotencyMetricResults.ClientErrorPolicy,
+
+                >= 400 and < 500 => null,
+
+                >= 500 and < 600 =>
+                    IdempotencyMetricResults.ServerError,
+
+                _ => throw new ArgumentOutOfRangeException(
+                    nameof(response))
+            };
+
+        if (rejectionReason is not null)
         {
-            >= 200 and < 400 => true,
-            408 or 429 => false,
-            >= 400 and < 500 => policy.StoreClientErrors,
-            >= 500 and < 600 => false,
-            _ => throw new ArgumentOutOfRangeException(nameof(response))
-        };
+            return new ResponseRetentionResult(
+                false,
+                rejectionReason);
+        }
+
+        if (response.Body.LongLength >
+            policy.MaxRetainedResponseBodySize)
+        {
+            return new ResponseRetentionResult(
+                false,
+                IdempotencyMetricResults.ResponseTooLarge);
+        }
+
+        return new ResponseRetentionResult(
+            true,
+            IdempotencyMetricResults.Retained);
     }
+
+    private readonly record struct ResponseRetentionResult(
+        bool ShouldStore,
+        string MetricResult);
 }

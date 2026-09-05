@@ -1,8 +1,8 @@
 using System.Net;
 using System.Text;
-using Carried.Idempotency.AspNet.Tests.Controllers;
+using Carried.Idempotency.AspNet.Tests.TestServer;
 
-namespace Carried.Idempotency.AspNet.Tests;
+namespace Carried.Idempotency.AspNet.Tests.Controllers;
 
 public sealed class ControllerIdempotencyIntegrationTests
 {

@@ -1,6 +1,6 @@
 using Carried.Idempotency.Store;
 
-namespace Carried.Idempotency.AspNet.Tests;
+namespace Carried.Idempotency.AspNet.Tests.LeaseLoss;
 
 internal sealed class LeaseLosingIdempotencyStore :
     IIdempotencyStore

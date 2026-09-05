@@ -1,10 +1,11 @@
 using System.Net;
 using System.Text.Json;
 using Carried.Idempotency.AspNet.Extensions;
+using Carried.Idempotency.AspNet.Tests.TestServer;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
 
-namespace Carried.Idempotency.AspNet.Tests;
+namespace Carried.Idempotency.AspNet.Tests.OpenApi;
 
 public sealed class IdempotencyOpenApiIntegrationTests
 {

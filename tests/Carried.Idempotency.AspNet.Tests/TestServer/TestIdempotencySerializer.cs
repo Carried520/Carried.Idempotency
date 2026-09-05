@@ -1,7 +1,7 @@
 using System.Text.Json;
 using Carried.Idempotency.Serialization;
 
-namespace Carried.Idempotency.AspNet.Tests;
+namespace Carried.Idempotency.AspNet.Tests.TestServer;
 
 internal sealed class TestIdempotencySerializer :
     IIdempotencySerializer

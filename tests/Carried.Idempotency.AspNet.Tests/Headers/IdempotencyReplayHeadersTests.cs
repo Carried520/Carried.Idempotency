@@ -1,9 +1,10 @@
 using System.Net;
 using Carried.Idempotency.AspNet.Extensions;
+using Carried.Idempotency.AspNet.Tests.TestServer;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
 
-namespace Carried.Idempotency.AspNet.Tests;
+namespace Carried.Idempotency.AspNet.Tests.Headers;
 
 public sealed class IdempotencyReplayHeadersTests
 {
