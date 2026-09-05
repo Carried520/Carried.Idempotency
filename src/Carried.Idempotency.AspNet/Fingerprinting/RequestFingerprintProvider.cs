@@ -2,14 +2,13 @@ using System.Buffers.Binary;
 using System.Security.Cryptography;
 using System.Text;
 using Microsoft.AspNetCore.Http;
-using Microsoft.AspNetCore.Routing;
 using Microsoft.Extensions.Primitives;
 
-namespace Carried.Idempotency.AspNet;
+namespace Carried.Idempotency.AspNet.Fingerprinting;
 
-public sealed class RequestFingerprintProvider
+internal static class RequestFingerprintProvider
 {
-    public async Task<string> CreateAsync(
+    public static async Task<string> CreateAsync(
         HttpContext context,
        string? routePattern)
     {

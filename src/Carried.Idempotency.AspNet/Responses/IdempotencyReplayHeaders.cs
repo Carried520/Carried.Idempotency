@@ -1,4 +1,4 @@
-namespace Carried.Idempotency.AspNet;
+namespace Carried.Idempotency.AspNet.Responses;
 
 internal static class IdempotencyReplayHeaders
 {

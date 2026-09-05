@@ -1,4 +1,5 @@
 using Carried.Idempotency.Exceptions;
+using Carried.Idempotency.IdempotencyOperation;
 using Carried.Idempotency.Options;
 using Carried.Idempotency.Serialization;
 using Carried.Idempotency.Store;
@@ -23,7 +24,7 @@ public partial class IdempotencyServiceTests
 
         var key = new IdempotencyKey("orders", "123");
 
-        int executionCount = 0;
+        var executionCount = 0;
 
         string? result = await service.ExecuteAsync(
             key,
@@ -31,7 +32,7 @@ public partial class IdempotencyServiceTests
             _ =>
             {
                 executionCount++;
-                return Task.FromResult<string?>("result");
+                return Task.FromResult(IdempotencyOperationResult<string>.Complete("result"));
             });
 
         Assert.Equal("result", result);
@@ -54,7 +55,7 @@ public partial class IdempotencyServiceTests
 
         var key = new IdempotencyKey("orders", "123");
 
-        int executionCount = 0;
+        var executionCount = 0;
 
         await service.ExecuteAsync(
             key,
@@ -62,7 +63,7 @@ public partial class IdempotencyServiceTests
             _ =>
             {
                 executionCount++;
-                return Task.FromResult<string?>("result");
+                return Task.FromResult(IdempotencyOperationResult<string>.Complete("result"));
             });
 
         string? replayed = await service.ExecuteAsync(
@@ -71,7 +72,7 @@ public partial class IdempotencyServiceTests
             _ =>
             {
                 executionCount++;
-                return Task.FromResult<string?>("different-result");
+                return Task.FromResult(IdempotencyOperationResult<string>.Complete("different-result"));
             });
 
         Assert.Equal("result", replayed);
@@ -103,7 +104,7 @@ public partial class IdempotencyServiceTests
         string? result = await service.ExecuteAsync(
             key,
             "fingerprint",
-            _ => Task.FromResult<string?>("retry-success"));
+            _ => Task.FromResult(IdempotencyOperationResult<string>.Complete("retry-success")));
 
         Assert.Equal("retry-success", result);
     }
@@ -127,13 +128,13 @@ public partial class IdempotencyServiceTests
         await service.ExecuteAsync(
             key,
             "fingerprint-a",
-            _ => Task.FromResult<string?>("result"));
+            _ => Task.FromResult(IdempotencyOperationResult<string>.Complete("result")));
 
         await Assert.ThrowsAsync<IdempotencyConflictException>(() =>
             service.ExecuteAsync(
                 key,
                 "fingerprint-b",
-                _ => Task.FromResult<string?>("other-result")));
+                _ => Task.FromResult(IdempotencyOperationResult<string>.Complete("other-result"))));
     }
 
     [Fact]
@@ -167,7 +168,7 @@ public partial class IdempotencyServiceTests
             {
                 operationStarted.SetResult(true);
                 await allowCompletion.Task;
-                return "result";
+                return IdempotencyOperationResult<string>.Complete("result");
             });
 
         await operationStarted.Task;
@@ -176,10 +177,92 @@ public partial class IdempotencyServiceTests
             service.ExecuteAsync(
                 key,
                 "fingerprint",
-                _ => Task.FromResult<string?>("second")));
+                _ => Task.FromResult(IdempotencyOperationResult<string>.Complete("second"))));
 
         allowCompletion.SetResult(true);
 
         Assert.Equal("result", await firstExecution);
+    }
+    
+    [Fact]
+    public async Task ExecuteAsync_ReleasedOperation_DoesNotRetainResult()
+    {
+        var options = new IdempotencyOptions();
+        TimeProvider timeProvider = TimeProvider.System;
+
+        var store = new InMemoryIdempotencyStore(options, timeProvider);
+        var serializer = new JsonIdempotencySerializer();
+        var service = new IdempotencyService(
+            store,
+            serializer,
+            options,
+            timeProvider);
+
+        var key = new IdempotencyKey("orders", "123");
+
+        var executionCount = 0;
+
+        string? first = await service.ExecuteAsync(
+            key,
+            "fingerprint",
+            _ =>
+            {
+                executionCount++;
+                return Task.FromResult(
+                    IdempotencyOperationResult<string>.Release("first"));
+            });
+
+        string? second = await service.ExecuteAsync(
+            key,
+            "fingerprint",
+            _ =>
+            {
+                executionCount++;
+                return Task.FromResult(
+                    IdempotencyOperationResult<string>.Release("second"));
+            });
+
+        Assert.Equal("first", first);
+        Assert.Equal("second", second);
+        Assert.Equal(2, executionCount);
+    }
+    
+    
+    [Fact]
+    public async Task ExecuteAsync_ReleasedOperation_CanBeCompletedByRetry()
+    {
+        var options = new IdempotencyOptions();
+        TimeProvider timeProvider = TimeProvider.System;
+
+        var store = new InMemoryIdempotencyStore(options, timeProvider);
+        var serializer = new JsonIdempotencySerializer();
+        var service = new IdempotencyService(
+            store,
+            serializer,
+            options,
+            timeProvider);
+
+        var key = new IdempotencyKey("orders", "123");
+
+        await service.ExecuteAsync(
+            key,
+            "fingerprint",
+            _ => Task.FromResult(
+                IdempotencyOperationResult<string>.Release("temporary")));
+
+        string? completed = await service.ExecuteAsync(
+            key,
+            "fingerprint",
+            _ => Task.FromResult(
+                IdempotencyOperationResult<string>.Complete("success")));
+
+        string? replayed = await service.ExecuteAsync(
+            key,
+            "fingerprint",
+            _ => Task.FromResult(
+                IdempotencyOperationResult<string>.Complete("should-not-run")));
+
+        Assert.Equal("success", completed);
+        Assert.Equal("success", replayed);
     }
 }

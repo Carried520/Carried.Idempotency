@@ -1,4 +1,6 @@
-﻿using Carried.Idempotency.AspNet.Metadata;
+﻿using Carried.Idempotency.AspNet.Fingerprinting;
+using Carried.Idempotency.AspNet.Metadata;
+using Carried.Idempotency.AspNet.Responses;
 using Carried.Idempotency.Exceptions;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Routing;
@@ -6,7 +8,7 @@ using Microsoft.Extensions.Primitives;
 
 namespace Carried.Idempotency.AspNet;
 
-public sealed class IdempotencyMiddleware
+internal sealed class IdempotencyMiddleware
 {
     private readonly RequestDelegate _next;
 
@@ -15,8 +17,7 @@ public sealed class IdempotencyMiddleware
         _next = next;
     }
 
-    public async Task InvokeAsync(HttpContext context, IdempotencyService idempotencyService, RequestFingerprintProvider fingerprintProvider,
-        IdempotentResponseExecutor responseExecutor)
+    public async Task InvokeAsync(HttpContext context, IdempotencyService idempotencyService, IdempotentResponseExecutor responseExecutor)
     {
         Endpoint? endpoint = context.GetEndpoint();
 
@@ -79,7 +80,7 @@ public sealed class IdempotencyMiddleware
             idempotencyKey);
 
         string fingerprint =
-            await fingerprintProvider.CreateAsync(
+            await RequestFingerprintProvider.CreateAsync(
                 context,
                 routePattern);
 
@@ -92,7 +93,7 @@ public sealed class IdempotencyMiddleware
                 fingerprint,
                 _next);
         }
-        catch (Exception exception) when(exception is IdempotencyConflictException or IdempotencyInProgressException or IdempotencyLeaseLostException)
+        catch (Exception exception) when (exception is IdempotencyConflictException or IdempotencyInProgressException or IdempotencyLeaseLostException)
         {
             context.Response.StatusCode = IdempotencyExceptionMapper.GetStatusCode(exception);
 
