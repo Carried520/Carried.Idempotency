@@ -37,11 +37,16 @@ public static class IdempotencyServiceCollectionExtensions
             services.TryAddSingleton(idempotencyService);
             services.TryAddSingleton<IdempotentResponseExecutor>();
 
-            services.TryAddEnumerable(
-                ServiceDescriptor.Singleton<IHostedService, IdempotencyEventLogger>());
-
             services.AddProblemDetails();
             services.TryAddSingleton<IIdempotencyErrorResponseWriter, IdempotencyErrorResponseWriter>();
+
+            return services;
+        }
+
+        public IServiceCollection AddIdempotencyLogging()
+        {
+            services.TryAddEnumerable(
+                ServiceDescriptor.Singleton<IHostedService, IdempotencyEventLogger>());
 
             return services;
         }

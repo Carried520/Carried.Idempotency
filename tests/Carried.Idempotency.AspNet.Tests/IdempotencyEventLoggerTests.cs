@@ -167,7 +167,7 @@ public sealed class IdempotencyEventLoggerTests
     }
 
     [Fact]
-    public async Task AddIdempotency_HostStarted_ActivatesLifecycleLogging()
+    public async Task AddIdempotencyLogging_HostStarted_ActivatesLifecycleLogging()
     {
         var loggerProvider = new TestLoggerProvider();
 
@@ -181,6 +181,7 @@ public sealed class IdempotencyEventLoggerTests
             .ConfigureServices(services =>
             {
                 services.AddIdempotency();
+                services.AddIdempotencyLogging();
             })
             .Build();
 
@@ -224,6 +225,48 @@ public sealed class IdempotencyEventLoggerTests
             loggerProvider.Entries,
             entry =>
                 entry.Message.Contains("secret-fingerprint"));
+    }
+
+    [Fact]
+    public async Task AddIdempotency_WithoutLogging_DoesNotActivateLifecycleLogging()
+    {
+        var loggerProvider = new TestLoggerProvider();
+
+        using IHost host = Host.CreateDefaultBuilder()
+            .ConfigureLogging(logging =>
+            {
+                logging.ClearProviders();
+                logging.AddProvider(loggerProvider);
+                logging.SetMinimumLevel(LogLevel.Debug);
+            })
+            .ConfigureServices(services =>
+            {
+                services.AddIdempotency();
+            })
+            .Build();
+
+        await host.StartAsync();
+
+        IdempotencyService service =
+            host.Services.GetRequiredService<IdempotencyService>();
+
+        var key = new IdempotencyKey(
+            "POST:/orders",
+            "key-1");
+
+        await service.ExecuteAsync(
+            key,
+            "fingerprint",
+            _ => Task.FromResult(
+                IdempotencyOperationResult<string>.Complete("result")));
+
+        await host.StopAsync();
+
+        Assert.DoesNotContain(
+            loggerProvider.Entries,
+            entry =>
+                entry.EventId.Id is >= 1 and <= 8 &&
+                entry.Message.Contains("Idempotency"));
     }
 
     private sealed class TestLogger<T> : ILogger<T>
