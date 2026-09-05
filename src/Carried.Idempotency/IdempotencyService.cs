@@ -1,5 +1,6 @@
 ﻿using System.Runtime.ExceptionServices;
 using Carried.Idempotency.Exceptions;
+using Carried.Idempotency.IdempotencyOperation;
 using Carried.Idempotency.Options;
 using Carried.Idempotency.Serialization;
 using Carried.Idempotency.Store;
@@ -48,8 +49,8 @@ public sealed class IdempotencyService
 
         return new IdempotencyService(store, serializer, options, timeProvider);
     }
-    
-    
+
+
     public static IdempotencyService Create(
         IIdempotencyStore store,
         IIdempotencySerializer serializer,
@@ -75,8 +76,8 @@ public sealed class IdempotencyService
     ///
     /// <remarks>
     /// If the key is acquired, the operation is executed while the service periodically
-    /// renews its ownership lease. On the successful completion, the result is serialized
-    /// and retained by the configured store for subsequent replay.
+    /// renews its ownership lease. The operation determines whether its result is retained
+    /// for replay or ownership is released without retaining the result.
     ///
     /// If a completed entry already exists with the same fingerprint, its stored result
     /// is returned without executing the operation again.
@@ -86,7 +87,7 @@ public sealed class IdempotencyService
     /// caller currently owns the key results in an
     /// <see cref="IdempotencyInProgressException"/>.
     ///
-    /// If ownership of the key is lost before the operation can be completed,
+    /// If ownership of the key is lost before the requested state transition can be applied,
     /// an <see cref="IdempotencyLeaseLostException"/> is thrown.
     /// </remarks>
     /// <exception cref="IdempotencyConflictException">
@@ -98,12 +99,12 @@ public sealed class IdempotencyService
     /// </exception>
     ///
     /// <exception cref="IdempotencyLeaseLostException">
-    /// Thrown when ownership of the idempotency key is lost before the operation can be completed.
+    /// Thrown when ownership of the idempotency key is lost before the requested state transition can be applied.
     /// </exception>
     public async Task<T?> ExecuteAsync<T>(
         IdempotencyKey key,
         string fingerprint,
-        Func<CancellationToken, Task<T?>> operation,
+        Func<CancellationToken, Task<IdempotencyOperationResult<T>>> operation,
         CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(key);
@@ -122,7 +123,7 @@ public sealed class IdempotencyService
                 Guid ownerToken = acquireResult.OwnerToken
                                   ?? throw new InvalidOperationException("Acquired result has no owner token.");
 
-                T? operationResult = default;
+                IdempotencyOperationResult<T>? operationResult = null;
 
                 Task heartbeatTask = RunLeaseHeartbeatAsync(key, ownerToken, leaseLossCts, heartbeatStopCts.Token);
 
@@ -155,12 +156,32 @@ public sealed class IdempotencyService
                     operationException.Throw();
                 }
 
-                bool completed;
+                if (operationResult is null)
+                {
+                    await StopHeartbeatAsync(heartbeatStopCts, heartbeatTask);
+                    await TryReleaseBestEffortAsync(key, ownerToken);
+                    throw new InvalidOperationException(
+                        "The idempotency operation returned a null result.");
+                }
+
+                bool transitionSucceeded;
 
                 try
                 {
-                    byte[] payload = _serializer.Serialize(operationResult);
-                    completed = await _store.TryCompleteAsync(key, ownerToken, payload, CancellationToken.None);
+                    switch (operationResult.Outcome)
+                    {
+                        case IdempotencyOperationOutcome.Complete:
+                        {
+                            byte[] payload = _serializer.Serialize(operationResult.Value);
+                            transitionSucceeded = await _store.TryCompleteAsync(key, ownerToken, payload, CancellationToken.None);
+                            break;
+                        }
+                        case IdempotencyOperationOutcome.Release:
+                            transitionSucceeded = await _store.TryReleaseAsync(key, ownerToken, CancellationToken.None);
+                            break;
+                        default:
+                            throw new InvalidOperationException("Unknown operation result");
+                    }
                 }
                 catch
                 {
@@ -170,7 +191,7 @@ public sealed class IdempotencyService
 
                 ExceptionDispatchInfo? finalHeartbeatException = await StopHeartbeatAsync(heartbeatStopCts, heartbeatTask);
 
-                if (completed) return operationResult;
+                if (transitionSucceeded) return operationResult.Value;
 
                 finalHeartbeatException?.Throw();
 

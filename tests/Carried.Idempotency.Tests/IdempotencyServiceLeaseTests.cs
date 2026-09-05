@@ -1,4 +1,5 @@
 using Carried.Idempotency.Exceptions;
+using Carried.Idempotency.IdempotencyOperation;
 using Carried.Idempotency.Options;
 using Carried.Idempotency.Serialization;
 using Carried.Idempotency.Store;
@@ -45,17 +46,16 @@ public partial class IdempotencyServiceTests
 
                 await allowCompletion.Task.WaitAsync(cancellationToken);
 
-                return "result";
+                return IdempotencyOperationResult<string>.Complete("result");
             });
 
         await operationStarted.Task;
-        
-        for (int i = 0; i < 4; i++)
+
+        for (var i = 0; i < 4; i++)
         {
             timeProvider.Advance(TimeSpan.FromMinutes(1));
             await Task.Yield();
         }
-
 
         IdempotencyAcquireResult acquire =
             await store.TryAcquireAsync(key, "fingerprint");
@@ -108,15 +108,14 @@ public partial class IdempotencyServiceTests
                     Timeout.InfiniteTimeSpan,
                     cancellationToken);
 
-                return "never";
+                return IdempotencyOperationResult<string>.Complete("never");
             });
 
         await operationStarted.Task;
 
         timeProvider.Advance(TimeSpan.FromMinutes(1));
 
-        await Assert.ThrowsAsync<IdempotencyLeaseLostException>(
-            () => execution);
+        await Assert.ThrowsAsync<IdempotencyLeaseLostException>(() => execution);
     }
 
     [Fact]
@@ -158,16 +157,15 @@ public partial class IdempotencyServiceTests
                     Timeout.InfiniteTimeSpan,
                     cancellationToken);
 
-                return "never";
+                return IdempotencyOperationResult<string>.Complete("never");
             });
 
         await operationStarted.Task;
 
         timeProvider.Advance(TimeSpan.FromMinutes(1));
 
-        InvalidOperationException exception =
-            await Assert.ThrowsAsync<InvalidOperationException>(
-                () => execution);
+        var exception =
+            await Assert.ThrowsAsync<InvalidOperationException>(() => execution);
 
         Assert.Equal("heartbeat failure", exception.Message);
     }
