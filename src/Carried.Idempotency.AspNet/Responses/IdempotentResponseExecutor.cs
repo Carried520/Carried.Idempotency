@@ -1,25 +1,18 @@
-using Carried.Idempotency.AspNet.Options;
+using Carried.Idempotency.AspNet.Policies;
 using Carried.Idempotency.IdempotencyOperation;
 using Microsoft.AspNetCore.Http;
-using Microsoft.Extensions.Options;
 using Microsoft.Extensions.Primitives;
 
 namespace Carried.Idempotency.AspNet.Responses;
 
 internal sealed class IdempotentResponseExecutor
 {
-    private readonly IdempotencyAspNetOptions _options;
-
-    public IdempotentResponseExecutor(IOptions<IdempotencyAspNetOptions> options)
-    {
-        _options = options.Value;
-    }
-
     internal async Task ExecuteAsync(
         HttpContext context,
         IdempotencyService idempotencyService,
         IdempotencyKey key,
         string fingerprint,
+        IdempotencyPolicy policy,
         RequestDelegate next)
     {
         Stream originalBody = context.Response.Body;
@@ -61,7 +54,7 @@ internal sealed class IdempotentResponseExecutor
                         StringComparer.OrdinalIgnoreCase);
                     foreach (KeyValuePair<string, StringValues> header in context.Response.Headers)
                     {
-                        if (!_options.ReplayHeaders.Contains(header.Key))
+                        if (!policy.ReplayHeaders.Contains(header.Key))
                             continue;
 
                         headers[header.Key] = header.Value.OfType<string>().ToArray();
@@ -73,8 +66,7 @@ internal sealed class IdempotentResponseExecutor
                         headers,
                         body);
 
-                    bool shouldStore = ShouldStoreResponse(idempotentHttpResponse) &&
-                                       idempotentHttpResponse.Body.Length <= _options.MaxRetainedResponseBodySize;
+                    bool shouldStore = ShouldStoreResponse(idempotentHttpResponse, policy);
 
                     return shouldStore
                         ? IdempotencyOperationResult<IdempotentHttpResponse>.Complete(idempotentHttpResponse)
@@ -109,16 +101,16 @@ internal sealed class IdempotentResponseExecutor
             context.RequestAborted);
     }
 
-    private bool ShouldStoreResponse(IdempotentHttpResponse response)
+    private static bool ShouldStoreResponse(IdempotentHttpResponse response, IdempotencyPolicy policy)
     {
-        if (response.Body.LongLength > _options.MaxRetainedResponseBodySize)
+        if (response.Body.LongLength > policy.MaxRetainedResponseBodySize)
             return false;
 
         return response.StatusCode switch
         {
             >= 200 and < 400 => true,
             408 or 429 => false,
-            >= 400 and < 500 => _options.StoreClientErrors,
+            >= 400 and < 500 => policy.StoreClientErrors,
             >= 500 and < 600 => false,
             _ => throw new ArgumentOutOfRangeException(nameof(response))
         };

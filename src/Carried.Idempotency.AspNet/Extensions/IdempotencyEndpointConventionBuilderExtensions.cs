@@ -13,5 +13,14 @@ public static class IdempotencyEndpointConventionBuilderExtensions
 
             return builder;
         }
+
+        public TBuilder RequireIdempotency(string policyName)
+        {
+            ArgumentException.ThrowIfNullOrWhiteSpace(policyName);
+
+            builder.Add(endpointBuilder => { endpointBuilder.Metadata.Add(new IdempotencyMetadata(policyName)); });
+
+            return builder;
+        }
     }
 }
