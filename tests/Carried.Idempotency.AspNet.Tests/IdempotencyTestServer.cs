@@ -23,7 +23,8 @@ internal sealed class IdempotencyTestServer :
 
     public static async Task<IdempotencyTestServer> CreateAsync(
         Action<IEndpointRouteBuilder>? configureEndpoints = null,
-        Action<IServiceCollection>? configureServices = null)
+        Action<IServiceCollection>? configureServices = null,
+        bool enableOpenApi = false)
     {
         WebApplicationBuilder builder =
             WebApplication.CreateBuilder();
@@ -37,6 +38,11 @@ internal sealed class IdempotencyTestServer :
             .AddApplicationPart(
                 typeof(IdempotencyTestServer).Assembly);
 
+        if (enableOpenApi)
+        {
+            builder.Services.AddIdempotencyOpenApi();
+        }
+
         configureServices?.Invoke(builder.Services);
 
         WebApplication app =
@@ -47,6 +53,11 @@ internal sealed class IdempotencyTestServer :
         app.MapControllers();
 
         configureEndpoints?.Invoke(app);
+
+        if (enableOpenApi)
+        {
+            app.MapOpenApi();
+        }
 
         await app.StartAsync();
 
