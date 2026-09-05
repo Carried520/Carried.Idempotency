@@ -1,6 +1,6 @@
 using Microsoft.AspNetCore.Builder;
 
-namespace Carried.Idempotency.AspNet;
+namespace Carried.Idempotency.AspNet.Extensions;
 
 public static class IdempotencyApplicationBuilderExtensions
 {

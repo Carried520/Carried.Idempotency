@@ -1,6 +1,7 @@
+using Carried.Idempotency.AspNet.Metadata;
 using Microsoft.AspNetCore.Builder;
 
-namespace Carried.Idempotency.AspNet;
+namespace Carried.Idempotency.AspNet.Extensions;
 
 public static class IdempotencyEndpointConventionBuilderExtensions
 {

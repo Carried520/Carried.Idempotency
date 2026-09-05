@@ -1,6 +1,6 @@
 ﻿using System.Net;
-using System.Net.Http.Json;
 using System.Text;
+using Carried.Idempotency.AspNet.Extensions;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
 
