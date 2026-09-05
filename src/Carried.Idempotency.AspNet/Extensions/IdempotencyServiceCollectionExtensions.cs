@@ -1,4 +1,5 @@
 using Carried.Idempotency.AspNet.Options;
+using Carried.Idempotency.AspNet.Policies;
 using Carried.Idempotency.AspNet.Responses;
 using Carried.Idempotency.Options;
 using Microsoft.Extensions.DependencyInjection;
@@ -20,8 +21,9 @@ public static class IdempotencyServiceCollectionExtensions
 
             services.AddOptions<IdempotencyAspNetOptions>()
                 .Validate(aspNetOptions => !string.IsNullOrWhiteSpace(aspNetOptions.HeaderName), "HeaderName is required.")
-                .Validate(aspNetOptions => aspNetOptions.MaxKeyLength > 0, "MaxKeyLength must be greater than zero.")
-                .Validate(aspNetOptions => aspNetOptions.MaxRetainedResponseBodySize > 0, "MaxRetainedResponseBodySize must be greater than zero.")
+                .Validate(aspNetOptions => IdempotencyPolicyValidator.IsValid(aspNetOptions.DefaultPolicy), "Default idempotency policy is invalid.")
+                .Validate(aspNetOptions => aspNetOptions.Policies.Values.All(IdempotencyPolicyValidator.IsValid),
+                    "One or more named idempotency policies are invalid.")
                 .ValidateOnStart();
 
             if (configureAspNetOptions is not null)

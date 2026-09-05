@@ -2,6 +2,7 @@
 using Carried.Idempotency.AspNet.Fingerprinting;
 using Carried.Idempotency.AspNet.Metadata;
 using Carried.Idempotency.AspNet.Options;
+using Carried.Idempotency.AspNet.Policies;
 using Carried.Idempotency.AspNet.Responses;
 using Carried.Idempotency.Exceptions;
 using Microsoft.AspNetCore.Http;
@@ -28,18 +29,23 @@ internal sealed class IdempotencyMiddleware
 
         var metadata =
             endpoint?.Metadata.GetMetadata<IdempotencyMetadata>();
-
+        
         if (metadata is null)
         {
             await _next(context);
             return;
         }
+        
+        IdempotencyPolicy policy =
+            metadata.PolicyName is null
+                ? _options.DefaultPolicy
+                : ResolvePolicy(metadata.PolicyName);
 
         if (!context.Request.Headers.TryGetValue(
                 _options.HeaderName,
                 out StringValues values) ||
             values.Count != 1 ||
-            string.IsNullOrWhiteSpace(values[0]) || values[0]!.Length > _options.MaxKeyLength)
+            string.IsNullOrWhiteSpace(values[0]) || values[0]!.Length > policy.MaxKeyLength)
         {
             context.Response.StatusCode =
                 StatusCodes.Status400BadRequest;
@@ -91,11 +97,13 @@ internal sealed class IdempotencyMiddleware
 
         try
         {
+
             await responseExecutor.ExecuteAsync(
                 context,
                 idempotencyService,
                 key,
                 fingerprint,
+                policy,
                 _next);
         }
         catch (Exception exception) when (exception is IdempotencyConflictException or IdempotencyInProgressException or IdempotencyLeaseLostException)
@@ -108,5 +116,15 @@ internal sealed class IdempotencyMiddleware
                 errorDescription = exception.Message,
             });
         }
+    }
+
+    private IdempotencyPolicy ResolvePolicy(string policyName)
+    {
+        if (_options.Policies.TryGetValue(policyName, out IdempotencyPolicy? policy))
+        {
+            return policy;
+        }
+
+        throw new InvalidOperationException($"Idempotency policy '{policyName}' is not configured.");
     }
 }

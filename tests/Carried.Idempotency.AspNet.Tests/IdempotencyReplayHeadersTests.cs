@@ -26,7 +26,7 @@ public sealed class IdempotencyReplayHeadersTests
                         })
                         .RequireIdempotency();
                 },
-                configureAspNetOptions: options => { options.ReplayHeaders.Add("X-Resource-Version"); });
+                configureAspNetOptions: options => { options.DefaultPolicy.ReplayHeaders.Add("X-Resource-Version"); });
 
         using var firstRequest =
             new HttpRequestMessage(
@@ -86,7 +86,7 @@ public sealed class IdempotencyReplayHeadersTests
                         })
                         .RequireIdempotency();
                 },
-                configureAspNetOptions: options => { options.ReplayHeaders.Remove("Location"); });
+                configureAspNetOptions: options => { options.DefaultPolicy.ReplayHeaders.Remove("Location"); });
 
         using var firstRequest =
             new HttpRequestMessage(
