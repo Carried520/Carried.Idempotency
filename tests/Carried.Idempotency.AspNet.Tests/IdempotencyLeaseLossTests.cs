@@ -1,5 +1,6 @@
 using System.Net;
 using System.Text;
+using Carried.Idempotency.AspNet.Extensions;
 using Carried.Idempotency.Options;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
@@ -125,13 +126,13 @@ public partial class IdempotencyIntegrationTests
                     TimeSpan.FromMinutes(1)
             };
 
-        IdempotencyService service =
+        var service =
             IdempotencyService.Create(
                 store,
                 new TestIdempotencySerializer(),
                 options);
 
-        await using IdempotencyTestServer server =
+        await using var server =
             await IdempotencyTestServer.CreateAsync(
                 endpoints =>
                 {

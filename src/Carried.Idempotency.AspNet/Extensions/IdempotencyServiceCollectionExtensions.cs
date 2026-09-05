@@ -2,7 +2,7 @@ using Carried.Idempotency.Options;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 
-namespace Carried.Idempotency.AspNet;
+namespace Carried.Idempotency.AspNet.Extensions;
 
 public static class IdempotencyServiceCollectionExtensions
 {
