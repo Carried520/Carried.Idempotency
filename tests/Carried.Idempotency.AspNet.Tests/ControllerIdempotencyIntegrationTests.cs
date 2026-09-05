@@ -1,5 +1,6 @@
 using System.Net;
 using System.Text;
+using Carried.Idempotency.AspNet.Tests.Controllers;
 
 namespace Carried.Idempotency.AspNet.Tests;
 

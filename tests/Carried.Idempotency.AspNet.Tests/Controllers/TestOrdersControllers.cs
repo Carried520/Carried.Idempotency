@@ -1,7 +1,7 @@
 using Carried.Idempotency.AspNet.Metadata;
 using Microsoft.AspNetCore.Mvc;
 
-namespace Carried.Idempotency.AspNet.Tests;
+namespace Carried.Idempotency.AspNet.Tests.Controllers;
 
 [ApiController]
 [Route("test-controller/orders")]
