@@ -1,5 +1,6 @@
 ﻿using System.Runtime.ExceptionServices;
 using Carried.Idempotency.Exceptions;
+using Carried.Idempotency.IdempotencyEvents;
 using Carried.Idempotency.IdempotencyOperation;
 using Carried.Idempotency.Options;
 using Carried.Idempotency.Serialization;
@@ -17,6 +18,15 @@ public sealed class IdempotencyService
     private readonly IIdempotencySerializer _serializer;
     private readonly TimeProvider _timeProvider;
     private readonly TimeSpan _heartbeatInterval;
+
+    public event EventHandler<IdempotencyAcquiredEvent>? Acquired;
+    public event EventHandler<IdempotencyInProgressEvent>? InProgress;
+    public event EventHandler<IdempotencyReplayedEvent>? Replayed;
+    public event EventHandler<IdempotencyConflictEvent>? Conflict;
+    public event EventHandler<IdempotencyCompletedEvent>? Completed;
+    public event EventHandler<IdempotencyReleasedEvent>? Released;
+    public event EventHandler<IdempotencyReleaseFailedEvent>? ReleaseFailed;
+    public event EventHandler<IdempotencyLeaseLostEvent>? LeaseLost;
 
     /// <summary>
     /// Initializes a new instance of the <see cref="IdempotencyService"/> class.
@@ -122,6 +132,7 @@ public sealed class IdempotencyService
 
                 Guid ownerToken = acquireResult.OwnerToken
                                   ?? throw new InvalidOperationException("Acquired result has no owner token.");
+                Emit(Acquired, new IdempotencyAcquiredEvent(key));
 
                 IdempotencyOperationResult<T>? operationResult = null;
 
@@ -150,6 +161,7 @@ public sealed class IdempotencyService
                         !cancellationToken.IsCancellationRequested)
                     {
                         heartbeatException?.Throw();
+                        Emit(LeaseLost, new IdempotencyLeaseLostEvent(key));
                         throw new IdempotencyLeaseLostException();
                     }
 
@@ -191,21 +203,40 @@ public sealed class IdempotencyService
 
                 ExceptionDispatchInfo? finalHeartbeatException = await StopHeartbeatAsync(heartbeatStopCts, heartbeatTask);
 
-                if (transitionSucceeded) return operationResult.Value;
+                if (transitionSucceeded)
+                {
+                    switch (operationResult.Outcome)
+                    {
+                        case IdempotencyOperationOutcome.Complete:
+                            Emit(Completed, new IdempotencyCompletedEvent(key));
+                            break;
+                        case IdempotencyOperationOutcome.Release:
+                            Emit(Released, new IdempotencyReleasedEvent(key));
+                            break;
+                        default:
+                            throw new InvalidOperationException("Unknown event");
+                    }
+
+                    return operationResult.Value;
+                }
 
                 finalHeartbeatException?.Throw();
 
+                Emit(LeaseLost, new IdempotencyLeaseLostEvent(key));
                 throw new IdempotencyLeaseLostException();
             }
             case IdempotencyAcquireStatus.Completed:
             {
+                Emit(Replayed, new IdempotencyReplayedEvent(key));
                 byte[] payload = acquireResult.Payload
                                  ?? throw new InvalidOperationException("Completed result has no payload.");
                 return _serializer.Deserialize<T>(payload);
             }
             case IdempotencyAcquireStatus.Conflict:
+                Emit(Conflict, new IdempotencyConflictEvent(key));
                 throw new IdempotencyConflictException();
             case IdempotencyAcquireStatus.InProgress:
+                Emit(InProgress, new IdempotencyInProgressEvent(key));
                 throw new IdempotencyInProgressException();
             default:
                 throw new InvalidOperationException($"Unknown acquire status: {acquireResult.Status}");
@@ -233,14 +264,17 @@ public sealed class IdempotencyService
     {
         try
         {
-            await _store.TryReleaseAsync(
+            bool released = await _store.TryReleaseAsync(
                 key,
                 ownerToken,
                 CancellationToken.None);
+
+            if (released)
+                Emit(Released, new IdempotencyReleasedEvent(key));
         }
-        catch
+        catch (Exception exception)
         {
-            // TODO: observability
+            Emit(ReleaseFailed, new IdempotencyReleaseFailedEvent(key, exception));
         }
     }
 
@@ -267,6 +301,24 @@ public sealed class IdempotencyService
         {
             await leaseLostCts.CancelAsync();
             throw;
+        }
+    }
+
+    private void Emit<TEvent>(EventHandler<TEvent>? handlers, TEvent @event)
+    {
+        if (handlers is null)
+            return;
+
+        foreach (Delegate subscriber in handlers.GetInvocationList())
+        {
+            try
+            {
+                ((EventHandler<TEvent>)subscriber)(this, @event);
+            }
+            catch
+            {
+                // event subscribers cannot affect idempotency execution
+            }
         }
     }
 }
