@@ -8,9 +8,12 @@ namespace Carried.Idempotency.AspNet.Fingerprinting;
 
 internal static class RequestFingerprintProvider
 {
+    private const byte AbsentMarker = 0;
+    private const byte PresentMarker = 1;
+
     public static async Task<string> CreateAsync(
         HttpContext context,
-       string? routePattern)
+        string? routePattern, IEnumerable<IIdempotencyFingerprintContributor> contributors, CancellationToken cancellationToken = default)
     {
         if (string.IsNullOrWhiteSpace(routePattern))
         {
@@ -59,7 +62,7 @@ internal static class RequestFingerprintProvider
             while ((bytesRead =
                        await context.Request.Body.ReadAsync(
                            buffer,
-                           context.RequestAborted)) > 0)
+                           cancellationToken)) > 0)
             {
                 hash.AppendData(
                     buffer.AsSpan(0, bytesRead));
@@ -68,6 +71,23 @@ internal static class RequestFingerprintProvider
         finally
         {
             context.Request.Body.Position = 0;
+        }
+
+        IOrderedEnumerable<IIdempotencyFingerprintContributor> sortedContributorsByName = contributors.OrderBy(x => x.Name, StringComparer.Ordinal);
+        foreach (IIdempotencyFingerprintContributor sortedContributor in sortedContributorsByName)
+        {
+            string? contributorValue = await sortedContributor.GetValueAsync(context, cancellationToken);
+            Append(hash, sortedContributor.Name);
+
+            if (contributorValue is null)
+            {
+                hash.AppendData([AbsentMarker]);
+            }
+            else
+            {
+                hash.AppendData([PresentMarker]);
+                Append(hash, contributorValue);
+            }
         }
 
         byte[] fingerprintBytes =
