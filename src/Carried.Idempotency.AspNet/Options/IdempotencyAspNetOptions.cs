@@ -4,9 +4,13 @@ namespace Carried.Idempotency.AspNet.Options;
 
 public sealed class IdempotencyAspNetOptions
 {
+    private readonly Dictionary<string, IdempotencyPolicy> _policies =
+        new(StringComparer.OrdinalIgnoreCase);
+
     public string HeaderName { get; set; } = "Idempotency-Key";
     public IdempotencyPolicy DefaultPolicy { get; } = new();
-    public IDictionary<string, IdempotencyPolicy> Policies { get; } = new Dictionary<string, IdempotencyPolicy>(StringComparer.OrdinalIgnoreCase);
+
+    internal IReadOnlyDictionary<string, IdempotencyPolicy> Policies => _policies;
 
     public void AddPolicy(string name, Action<IdempotencyPolicy> configure)
     {
@@ -14,10 +18,10 @@ public sealed class IdempotencyAspNetOptions
         ArgumentNullException.ThrowIfNull(configure);
 
         var policy = new IdempotencyPolicy();
-        
+
         configure(policy);
 
-        if (!Policies.TryAdd(name, policy))
+        if (!_policies.TryAdd(name, policy))
         {
             throw new InvalidOperationException($"The policy '{name}' is already configured.");
         }
