@@ -32,11 +32,23 @@ public sealed record IdempotencyAcquireResult
     /// <summary>
     /// Creates a result indicating that ownership of a key was acquired.
     /// </summary>
+    /// <param name="ownerToken">
+    /// The token identifying the acquired ownership.
+    /// </param>
+    /// <returns>
+    /// A result representing successful acquisition.
+    /// </returns>
     public static IdempotencyAcquireResult Acquired(Guid ownerToken) => new(IdempotencyAcquireStatus.Acquired, ownerToken);
 
     /// <summary>
     /// Creates a result containing the payload of a previously completed operation.
     /// </summary>
+    /// <param name="payload">
+    /// The serialized payload of the completed operation.
+    /// </param>
+    /// <returns>
+    /// A result representing a previously completed operation.
+    /// </returns>
     public static IdempotencyAcquireResult Completed(byte[] payload)
     {
         ArgumentNullException.ThrowIfNull(payload);
@@ -46,10 +58,16 @@ public sealed record IdempotencyAcquireResult
     /// <summary>
     /// Creates a result indicating that the key is currently being processed.
     /// </summary>
+    /// <returns>
+    /// A result indicating that the key is currently being processed.
+    /// </returns>
     public static IdempotencyAcquireResult InProgress() => new(IdempotencyAcquireStatus.InProgress);
     
     /// <summary>
     /// Creates a result indicating that the key conflicts with an existing entry.
     /// </summary>
+    /// <returns>
+    /// A result indicating that the key conflicts with an existing entry.
+    /// </returns>
     public static IdempotencyAcquireResult Conflict() => new(IdempotencyAcquireStatus.Conflict);
 }
