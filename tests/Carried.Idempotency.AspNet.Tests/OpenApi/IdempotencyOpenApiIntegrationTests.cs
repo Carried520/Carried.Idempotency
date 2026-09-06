@@ -14,6 +14,7 @@ public sealed class IdempotencyOpenApiIntegrationTests
     {
         await using IdempotencyTestServer server =
             await IdempotencyTestServer.CreateAsync(
+                opts => opts.UseInMemory(),
                 endpoints =>
                 {
                     endpoints
@@ -41,6 +42,7 @@ public sealed class IdempotencyOpenApiIntegrationTests
     {
         await using IdempotencyTestServer server =
             await IdempotencyTestServer.CreateAsync(
+                opts => opts.UseInMemory(),
                 endpoints =>
                 {
                     endpoints.MapPost(
@@ -65,8 +67,7 @@ public sealed class IdempotencyOpenApiIntegrationTests
     public async Task MarkedControllerAction_IncludesRequiredIdempotencyKeyHeader()
     {
         await using IdempotencyTestServer server =
-            await IdempotencyTestServer.CreateAsync(
-                enableOpenApi: true);
+            await IdempotencyTestServer.CreateAsync(opts => opts.UseInMemory(), enableOpenApi: true);
 
         using JsonDocument document =
             await GetOpenApiDocumentAsync(server);
@@ -84,8 +85,7 @@ public sealed class IdempotencyOpenApiIntegrationTests
     public async Task ClassLevelMarkedController_IncludesRequiredIdempotencyKeyHeader()
     {
         await using IdempotencyTestServer server =
-            await IdempotencyTestServer.CreateAsync(
-                enableOpenApi: true);
+            await IdempotencyTestServer.CreateAsync(opts => opts.UseInMemory(), enableOpenApi: true);
 
         using JsonDocument document =
             await GetOpenApiDocumentAsync(server);
@@ -103,8 +103,7 @@ public sealed class IdempotencyOpenApiIntegrationTests
     public async Task UnmarkedControllerAction_DoesNotIncludeIdempotencyKeyHeader()
     {
         await using IdempotencyTestServer server =
-            await IdempotencyTestServer.CreateAsync(
-                enableOpenApi: true);
+            await IdempotencyTestServer.CreateAsync(opts => opts.UseInMemory(), enableOpenApi: true);
 
         using JsonDocument document =
             await GetOpenApiDocumentAsync(server);
@@ -122,8 +121,7 @@ public sealed class IdempotencyOpenApiIntegrationTests
         IdempotencyTestServer server)
     {
         using HttpResponseMessage response =
-            await server.Client.GetAsync(
-                "/openapi/v1.json");
+            await server.Client.GetAsync("/openapi/v1.json");
 
         Assert.Equal(
             HttpStatusCode.OK,
@@ -194,8 +192,7 @@ public sealed class IdempotencyOpenApiIntegrationTests
             return;
         }
 
-        Assert.Null(
-            FindIdempotencyKeyHeader(parameters));
+        Assert.Null(FindIdempotencyKeyHeader(parameters));
     }
 
     private static JsonElement? FindIdempotencyKeyHeader(

@@ -2,24 +2,26 @@ using Microsoft.Extensions.Hosting;
 
 namespace Carried.Idempotency.AspNet.Observability;
 
-internal sealed class IdempotencyMetricsHostedService :
-    IHostedService
+internal sealed class IdempotencyMetricsHostedService : IHostedService
 {
     private readonly IdempotencyMetrics _metrics;
 
-    public IdempotencyMetricsHostedService(
-        IdempotencyMetrics metrics)
+    public IdempotencyMetricsHostedService(IdempotencyMetrics metrics)
     {
+        ArgumentNullException.ThrowIfNull(metrics);
+
         _metrics = metrics;
     }
 
     public Task StartAsync(CancellationToken cancellationToken)
     {
-        return _metrics.StartAsync(cancellationToken);
+        _metrics.Start();
+        return Task.CompletedTask;
     }
 
     public Task StopAsync(CancellationToken cancellationToken)
     {
-        return _metrics.StopAsync(cancellationToken);
+        _metrics.Stop();
+        return Task.CompletedTask;
     }
 }

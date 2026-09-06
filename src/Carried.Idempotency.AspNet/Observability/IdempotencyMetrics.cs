@@ -3,13 +3,11 @@ using Carried.Idempotency.IdempotencyEvents;
 
 namespace Carried.Idempotency.AspNet.Observability;
 
-internal class IdempotencyMetrics : IDisposable , IIdempotencyMetricsRecorder
+internal sealed class IdempotencyMetrics : IDisposable, IIdempotencyMetricsRecorder
 {
     internal const string MeterName = "Carried.Idempotency.AspNet";
     internal const string OperationsInstrumentName = "carried.idempotency.operations";
-    internal const string ResponsesInstrumentName =
-        "carried.idempotency.responses";
-    
+    internal const string ResponsesInstrumentName = "carried.idempotency.responses";
 
     private readonly IdempotencyService _idempotencyService;
     private readonly Meter _meter;
@@ -18,6 +16,8 @@ internal class IdempotencyMetrics : IDisposable , IIdempotencyMetricsRecorder
 
     public IdempotencyMetrics(IdempotencyService idempotencyService)
     {
+        ArgumentNullException.ThrowIfNull(idempotencyService);
+
         _idempotencyService = idempotencyService;
 
         _meter = new Meter(MeterName);
@@ -26,14 +26,14 @@ internal class IdempotencyMetrics : IDisposable , IIdempotencyMetricsRecorder
             OperationsInstrumentName,
             unit: "{operation}",
             description: "Number of idempotency lifecycle events.");
-        
+
         _responses = _meter.CreateCounter<long>(
             ResponsesInstrumentName,
             unit: "{response}",
             description: "Number of idempotent HTTP response retention decisions.");
     }
 
-    internal Task StartAsync(CancellationToken cancellationToken)
+    internal void Start()
     {
         _idempotencyService.Acquired += OnAcquired;
         _idempotencyService.InProgress += OnInProgress;
@@ -43,11 +43,9 @@ internal class IdempotencyMetrics : IDisposable , IIdempotencyMetricsRecorder
         _idempotencyService.Released += OnReleased;
         _idempotencyService.ReleaseFailed += OnReleaseFailed;
         _idempotencyService.LeaseLost += OnLeaseLost;
-
-        return Task.CompletedTask;
     }
 
-    internal Task StopAsync(CancellationToken cancellationToken)
+    internal void Stop()
     {
         _idempotencyService.Acquired -= OnAcquired;
         _idempotencyService.InProgress -= OnInProgress;
@@ -57,8 +55,6 @@ internal class IdempotencyMetrics : IDisposable , IIdempotencyMetricsRecorder
         _idempotencyService.Released -= OnReleased;
         _idempotencyService.ReleaseFailed -= OnReleaseFailed;
         _idempotencyService.LeaseLost -= OnLeaseLost;
-
-        return Task.CompletedTask;
     }
 
     private void OnAcquired(
@@ -125,7 +121,7 @@ internal class IdempotencyMetrics : IDisposable , IIdempotencyMetricsRecorder
                 "outcome",
                 outcome));
     }
-    
+
     public void RecordResponse(string result)
     {
         _responses.Add(

@@ -2,13 +2,16 @@ using Carried.Idempotency.AspNet.Errors;
 
 namespace Carried.Idempotency.AspNet.Responses;
 
-internal class IdempotentResponseCaptureStream : Stream
+internal sealed class IdempotentResponseCaptureStream : Stream
 {
     private readonly Stream _inner;
     private readonly Func<bool> _isUnsupportedResponse;
 
     internal IdempotentResponseCaptureStream(Stream inner, Func<bool> isUnsupportedResponse)
     {
+        ArgumentNullException.ThrowIfNull(inner);
+        ArgumentNullException.ThrowIfNull(isUnsupportedResponse);
+
         _inner = inner;
         _isUnsupportedResponse = isUnsupportedResponse;
     }
@@ -31,6 +34,12 @@ internal class IdempotentResponseCaptureStream : Stream
         _inner.Flush();
     }
 
+    public override Task FlushAsync(CancellationToken cancellationToken)
+    {
+        ThrowIfUnsupported();
+        return _inner.FlushAsync(cancellationToken);
+    }
+
     public override int Read(byte[] buffer, int offset, int count)
     {
         return _inner.Read(buffer, offset, count);
@@ -48,6 +57,7 @@ internal class IdempotentResponseCaptureStream : Stream
 
     public override void Write(byte[] buffer, int offset, int count)
     {
+        ThrowIfUnsupported();
         _inner.Write(buffer, offset, count);
     }
 

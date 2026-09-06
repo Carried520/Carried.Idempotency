@@ -1,3 +1,4 @@
+using Carried.Idempotency.AspNet.Builders;
 using Carried.Idempotency.AspNet.Extensions;
 using Carried.Idempotency.AspNet.Options;
 using Microsoft.AspNetCore.Builder;
@@ -23,23 +24,22 @@ internal sealed class IdempotencyTestServer :
     }
 
     public static async Task<IdempotencyTestServer> CreateAsync(
+        Action<IdempotencyBuilder> configureAspNetOptions,
         Action<IEndpointRouteBuilder>? configureEndpoints = null,
         Action<IServiceCollection>? configureServices = null,
-        Action<IdempotencyAspNetOptions>? configureAspNetOptions = null,
-        bool enableOpenApi = false)
+        bool enableOpenApi = false
+    )
     {
         WebApplicationBuilder builder =
             WebApplication.CreateBuilder();
 
         builder.WebHost.UseTestServer();
 
-        builder.Services.AddIdempotency(
-            configureAspNetOptions: configureAspNetOptions);
+        builder.Services.AddIdempotency(configureAspNetOptions);
 
         builder.Services
             .AddControllers()
-            .AddApplicationPart(
-                typeof(IdempotencyTestServer).Assembly);
+            .AddApplicationPart(typeof(IdempotencyTestServer).Assembly);
 
         if (enableOpenApi)
         {

@@ -2,19 +2,22 @@ namespace Carried.Idempotency.AspNet.Fingerprinting;
 
 internal static class FingerprintContributorValidator
 {
-    internal static string? Validate(IEnumerable<IIdempotencyFingerprintContributor> contributors)
+    internal static IEnumerable<string> Validate(IEnumerable<IIdempotencyFingerprintContributor> contributors)
     {
+        ArgumentNullException.ThrowIfNull(contributors);
+
         var names = new HashSet<string>(StringComparer.Ordinal);
 
         foreach (IIdempotencyFingerprintContributor contributor in contributors)
         {
             if (string.IsNullOrWhiteSpace(contributor.Name))
-                return "Contributor name cannot be null or whitespace.";
+            {
+                yield return "Contributor name cannot be null or whitespace.";
+                continue;
+            }
 
             if (!names.Add(contributor.Name))
-                return $"Fingerprint contributor name '{contributor.Name}' is already configured.";
+                yield return $"Fingerprint contributor name '{contributor.Name}' is already configured.";
         }
-
-        return null;
     }
 }

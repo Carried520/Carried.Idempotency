@@ -9,10 +9,14 @@ internal sealed class IdempotencyErrorResponseWriter : IIdempotencyErrorResponse
 
     public IdempotencyErrorResponseWriter(IProblemDetailsService problemDetailsService)
     {
+        ArgumentNullException.ThrowIfNull(problemDetailsService);
         _problemDetailsService = problemDetailsService;
     }
 
-    public async Task WriteAsync(HttpContext context, IdempotencyError error, CancellationToken cancellationToken = default)
+    public async Task WriteAsync(
+        HttpContext context,
+        IdempotencyError error,
+        CancellationToken cancellationToken = default)
     {
         context.Response.StatusCode = error.StatusCode;
 
@@ -27,6 +31,7 @@ internal sealed class IdempotencyErrorResponseWriter : IIdempotencyErrorResponse
             }
         };
 
-        await _problemDetailsService.WriteAsync(new ProblemDetailsContext { HttpContext = context, ProblemDetails = problemDetails });
+        await _problemDetailsService.WriteAsync(
+            new ProblemDetailsContext { HttpContext = context, ProblemDetails = problemDetails });
     }
 }

@@ -180,7 +180,7 @@ public sealed class IdempotencyEventLoggerTests
             })
             .ConfigureServices(services =>
             {
-                services.AddIdempotency();
+                services.AddIdempotency(opts => opts.UseInMemory());
                 services.AddIdempotencyLogging();
             })
             .Build();
@@ -241,7 +241,7 @@ public sealed class IdempotencyEventLoggerTests
             })
             .ConfigureServices(services =>
             {
-                services.AddIdempotency();
+                services.AddIdempotency(opts => opts.UseInMemory());
             })
             .Build();
 

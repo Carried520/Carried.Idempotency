@@ -13,10 +13,12 @@ internal sealed partial class IdempotencyEventLogger : IHostedService
         IdempotencyService idempotencyService,
         ILogger<IdempotencyEventLogger> logger)
     {
+        ArgumentNullException.ThrowIfNull(idempotencyService);
+        ArgumentNullException.ThrowIfNull(logger);
+
         _idempotencyService = idempotencyService;
         _logger = logger;
     }
-
 
     public Task StartAsync(CancellationToken cancellationToken)
     {

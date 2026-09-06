@@ -1,5 +1,6 @@
 using System.Net;
 using System.Text;
+using Carried.Idempotency.AspNet.Extensions;
 using Carried.Idempotency.AspNet.Tests.TestServer;
 
 namespace Carried.Idempotency.AspNet.Tests.Controllers;
@@ -12,7 +13,7 @@ public sealed class ControllerIdempotencyIntegrationTests
         TestOrdersController.Reset();
 
         await using IdempotencyTestServer server =
-            await IdempotencyTestServer.CreateAsync();
+            await IdempotencyTestServer.CreateAsync(opts => opts.UseInMemory());
 
         using HttpResponseMessage response =
             await server.Client.PostAsync(
@@ -34,7 +35,7 @@ public sealed class ControllerIdempotencyIntegrationTests
         TestOrdersController.Reset();
 
         await using IdempotencyTestServer server =
-            await IdempotencyTestServer.CreateAsync();
+            await IdempotencyTestServer.CreateAsync(opts => opts.UseInMemory());
 
         using HttpResponseMessage first =
             await SendAsync(
@@ -83,7 +84,7 @@ public sealed class ControllerIdempotencyIntegrationTests
         TestOrdersController.Reset();
 
         await using IdempotencyTestServer server =
-            await IdempotencyTestServer.CreateAsync();
+            await IdempotencyTestServer.CreateAsync(opts => opts.UseInMemory());
 
         using HttpResponseMessage first =
             await SendAsync(
@@ -126,7 +127,7 @@ public sealed class ControllerIdempotencyIntegrationTests
         TestPaymentsController.Reset();
 
         await using IdempotencyTestServer server =
-            await IdempotencyTestServer.CreateAsync();
+            await IdempotencyTestServer.CreateAsync(opts => opts.UseInMemory());
 
         using HttpResponseMessage response =
             await server.Client.PostAsync(
@@ -148,7 +149,7 @@ public sealed class ControllerIdempotencyIntegrationTests
         TestPaymentsController.Reset();
 
         await using IdempotencyTestServer server =
-            await IdempotencyTestServer.CreateAsync();
+            await IdempotencyTestServer.CreateAsync(opts => opts.UseInMemory());
 
         using HttpResponseMessage first =
             await SendAsync(

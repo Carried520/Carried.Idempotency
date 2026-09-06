@@ -17,17 +17,23 @@ public sealed class IdempotencyReplayHeadersTests
             await IdempotencyTestServer.CreateAsync(
                 configureEndpoints: endpoints =>
                 {
-                    endpoints.MapPost("/test", (HttpContext context) =>
-                        {
-                            executionCount++;
+                    endpoints.MapPost(
+                            "/test",
+                            (HttpContext context) =>
+                            {
+                                executionCount++;
 
-                            context.Response.Headers["X-Resource-Version"] = "v1";
+                                context.Response.Headers["X-Resource-Version"] = "v1";
 
-                            return Results.Ok();
-                        })
+                                return Results.Ok();
+                            })
                         .RequireIdempotency();
                 },
-                configureAspNetOptions: options => { options.DefaultPolicy.ReplayHeaders.Add("X-Resource-Version"); });
+                configureAspNetOptions: options =>
+                {
+                    options.DefaultPolicy.ReplayHeaders.Add("X-Resource-Version");
+                    options.UseInMemory();
+                });
 
         using var firstRequest =
             new HttpRequestMessage(
@@ -76,18 +82,24 @@ public sealed class IdempotencyReplayHeadersTests
             await IdempotencyTestServer.CreateAsync(
                 configureEndpoints: endpoints =>
                 {
-                    endpoints.MapPost("/test", (HttpContext context) =>
-                        {
-                            executionCount++;
+                    endpoints.MapPost(
+                            "/test",
+                            (HttpContext context) =>
+                            {
+                                executionCount++;
 
-                            context.Response.Headers.Location =
-                                "/resource/123";
+                                context.Response.Headers.Location =
+                                    "/resource/123";
 
-                            return Results.Ok();
-                        })
+                                return Results.Ok();
+                            })
                         .RequireIdempotency();
                 },
-                configureAspNetOptions: options => { options.DefaultPolicy.ReplayHeaders.Remove("Location"); });
+                configureAspNetOptions: options =>
+                {
+                    options.DefaultPolicy.ReplayHeaders.Remove("Location");
+                    options.UseInMemory();
+                });
 
         using var firstRequest =
             new HttpRequestMessage(

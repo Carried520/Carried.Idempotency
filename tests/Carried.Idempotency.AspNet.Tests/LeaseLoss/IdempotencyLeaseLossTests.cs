@@ -16,12 +16,10 @@ public partial class IdempotencyIntegrationTests
     public async Task LeaseLoss_CancelsEndpointCancellationToken()
     {
         var endpointStarted =
-            new TaskCompletionSource(
-                TaskCreationOptions.RunContinuationsAsynchronously);
+            new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
 
         var endpointCancelled =
-            new TaskCompletionSource(
-                TaskCreationOptions.RunContinuationsAsynchronously);
+            new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
 
         var store =
             new LeaseLosingIdempotencyStore();
@@ -44,6 +42,7 @@ public partial class IdempotencyIntegrationTests
 
         await using var server =
             await IdempotencyTestServer.CreateAsync(
+                opts => opts.UseInMemory(),
                 endpoints =>
                 {
                     endpoints.MapPost(
@@ -86,22 +85,18 @@ public partial class IdempotencyIntegrationTests
                 "lease-loss-key",
                 "{}");
 
-        await endpointStarted.Task.WaitAsync(
-            TimeSpan.FromSeconds(5));
+        await endpointStarted.Task.WaitAsync(TimeSpan.FromSeconds(5));
 
-        await endpointCancelled.Task.WaitAsync(
-            TimeSpan.FromSeconds(5));
+        await endpointCancelled.Task.WaitAsync(TimeSpan.FromSeconds(5));
 
         using HttpResponseMessage response =
-            await request.WaitAsync(
-                TimeSpan.FromSeconds(5));
+            await request.WaitAsync(TimeSpan.FromSeconds(5));
 
         Assert.Equal(
             HttpStatusCode.Conflict,
             response.StatusCode);
 
-        Assert.True(
-            store.RenewalAttempts >= 1);
+        Assert.True(store.RenewalAttempts >= 1);
     }
 
 
@@ -109,8 +104,7 @@ public partial class IdempotencyIntegrationTests
     public async Task LeaseLoss_StopsCooperativeEndpointExecution()
     {
         var endpointStarted =
-            new TaskCompletionSource(
-                TaskCreationOptions.RunContinuationsAsynchronously);
+            new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
 
         int workCompleted = 0;
 
@@ -135,6 +129,7 @@ public partial class IdempotencyIntegrationTests
 
         await using var server =
             await IdempotencyTestServer.CreateAsync(
+                opts => opts.UseInMemory(),
                 endpoints =>
                 {
                     endpoints.MapPost(
@@ -148,8 +143,7 @@ public partial class IdempotencyIntegrationTests
                                     Timeout.InfiniteTimeSpan,
                                     cancellationToken);
 
-                                Interlocked.Increment(
-                                    ref workCompleted);
+                                Interlocked.Increment(ref workCompleted);
 
                                 return Results.Ok();
                             })
@@ -169,12 +163,10 @@ public partial class IdempotencyIntegrationTests
                 "lease-loss-key",
                 "{}");
 
-        await endpointStarted.Task.WaitAsync(
-            TimeSpan.FromSeconds(5));
+        await endpointStarted.Task.WaitAsync(TimeSpan.FromSeconds(5));
 
         using HttpResponseMessage response =
-            await request.WaitAsync(
-                TimeSpan.FromSeconds(5));
+            await request.WaitAsync(TimeSpan.FromSeconds(5));
 
         Assert.Equal(
             HttpStatusCode.Conflict,
@@ -184,8 +176,7 @@ public partial class IdempotencyIntegrationTests
             0,
             Volatile.Read(ref workCompleted));
 
-        Assert.True(
-            store.RenewalAttempts >= 1);
+        Assert.True(store.RenewalAttempts >= 1);
     }
 
 
@@ -193,42 +184,42 @@ public partial class IdempotencyIntegrationTests
     public async Task ClientCancellation_StillCancelsEndpointCancellationToken()
     {
         var endpointStarted =
-            new TaskCompletionSource(
-                TaskCreationOptions.RunContinuationsAsynchronously);
+            new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
 
         var endpointCancelled =
-            new TaskCompletionSource(
-                TaskCreationOptions.RunContinuationsAsynchronously);
+            new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
 
         await using IdempotencyTestServer server =
-            await IdempotencyTestServer.CreateAsync(endpoints =>
-            {
-                endpoints.MapPost(
-                        "/orders",
-                        async (
-                            CancellationToken cancellationToken) =>
-                        {
-                            endpointStarted.TrySetResult();
-
-                            try
+            await IdempotencyTestServer.CreateAsync(
+                opts => opts.UseInMemory(),
+                endpoints =>
+                {
+                    endpoints.MapPost(
+                            "/orders",
+                            async (
+                                CancellationToken cancellationToken) =>
                             {
-                                await Task.Delay(
-                                    Timeout.InfiniteTimeSpan,
-                                    cancellationToken);
-                            }
-                            catch (OperationCanceledException)
-                                when (cancellationToken
-                                          .IsCancellationRequested)
-                            {
-                                endpointCancelled.TrySetResult();
+                                endpointStarted.TrySetResult();
 
-                                throw;
-                            }
+                                try
+                                {
+                                    await Task.Delay(
+                                        Timeout.InfiniteTimeSpan,
+                                        cancellationToken);
+                                }
+                                catch (OperationCanceledException)
+                                    when (cancellationToken
+                                              .IsCancellationRequested)
+                                {
+                                    endpointCancelled.TrySetResult();
 
-                            return Results.Ok();
-                        })
-                    .RequireIdempotency();
-            });
+                                    throw;
+                                }
+
+                                return Results.Ok();
+                            })
+                        .RequireIdempotency();
+                });
 
         using var cancellation =
             new CancellationTokenSource();
@@ -253,13 +244,11 @@ public partial class IdempotencyIntegrationTests
                 request,
                 cancellation.Token);
 
-        await endpointStarted.Task.WaitAsync(
-            TimeSpan.FromSeconds(5));
+        await endpointStarted.Task.WaitAsync(TimeSpan.FromSeconds(5));
 
         cancellation.Cancel();
 
-        await endpointCancelled.Task.WaitAsync(
-            TimeSpan.FromSeconds(5));
+        await endpointCancelled.Task.WaitAsync(TimeSpan.FromSeconds(5));
 
         await Assert.ThrowsAnyAsync<OperationCanceledException>(async () => { await responseTask; });
     }
