@@ -19,19 +19,65 @@ public sealed class IdempotencyService
     private readonly TimeProvider _timeProvider;
     private readonly TimeSpan _heartbeatInterval;
 
+    /// <summary>
+    /// Occurs when ownership of an idempotency key is successfully acquired.
+    /// </summary>
     public event EventHandler<IdempotencyAcquiredEvent>? Acquired;
+
+    /// <summary>
+    /// Occurs when an operation encounters an idempotency key that is already in progress.
+    /// </summary>
     public event EventHandler<IdempotencyInProgressEvent>? InProgress;
+
+    /// <summary>
+    /// Occurs when a previously completed operation is replayed.
+    /// </summary>
     public event EventHandler<IdempotencyReplayedEvent>? Replayed;
+
+    /// <summary>
+    /// Occurs when an idempotency key is reused for a different operation.
+    /// </summary>
     public event EventHandler<IdempotencyConflictEvent>? Conflict;
+
+    /// <summary>
+    /// Occurs when an idempotent operation is successfully completed and retained for replay.
+    /// </summary>
     public event EventHandler<IdempotencyCompletedEvent>? Completed;
+
+    /// <summary>
+    /// Occurs when ownership of an idempotency key is successfully released.
+    /// </summary>
     public event EventHandler<IdempotencyReleasedEvent>? Released;
+
+    /// <summary>
+    /// Occurs when a best-effort release of an idempotency key fails.
+    /// </summary>
     public event EventHandler<IdempotencyReleaseFailedEvent>? ReleaseFailed;
+
+    /// <summary>
+    /// Occurs when ownership of an idempotency key is lost before the requested state transition can be applied.
+    /// </summary>
     public event EventHandler<IdempotencyLeaseLostEvent>? LeaseLost;
 
     /// <summary>
     /// Initializes a new instance of the <see cref="IdempotencyService"/> class.
     /// </summary>
-    public IdempotencyService(IIdempotencyStore store, IIdempotencySerializer serializer, IdempotencyOptions idempotencyOptions, TimeProvider timeProvider)
+    /// <param name="store">
+    /// The idempotency store used to coordinate operation state.
+    /// </param>
+    /// <param name="serializer">
+    /// The serializer used to retain and replay completed operation results.
+    /// </param>
+    /// <param name="idempotencyOptions">
+    /// The options that configure idempotency behavior.
+    /// </param>
+    /// <param name="timeProvider">
+    /// The time provider used for lease renewal timing.
+    /// </param>
+    public IdempotencyService(IIdempotencyStore store,
+        IIdempotencySerializer serializer,
+        IdempotencyOptions idempotencyOptions,
+        TimeProvider timeProvider)
     {
         ArgumentNullException.ThrowIfNull(store);
         ArgumentNullException.ThrowIfNull(serializer);
@@ -49,7 +95,19 @@ public sealed class IdempotencyService
     /// <summary>
     /// Creates an idempotency service backed by an in-memory store and JSON serialization.
     /// </summary>
-    public static IdempotencyService CreateInMemory(IdempotencyOptions? options = null, TimeProvider? timeProvider = null)
+    /// <param name="options">
+    /// The options that configure idempotency behavior, or <see langword="null"/>
+    /// to use the defaults.
+    /// </param>
+    /// <param name="timeProvider">
+    /// The time provider to use, or <see langword="null"/> to use
+    /// <see cref="TimeProvider.System"/>.
+    /// </param>
+    /// <returns>
+    /// A new in-memory idempotency service.
+    /// </returns>
+    public static IdempotencyService CreateInMemory(IdempotencyOptions? options = null,
+        TimeProvider? timeProvider = null)
     {
         options ??= new IdempotencyOptions();
         timeProvider ??= TimeProvider.System;
@@ -61,6 +119,25 @@ public sealed class IdempotencyService
     }
 
 
+    /// <summary>
+    /// Creates an idempotency service using the specified store and serializer.
+    /// </summary>
+    /// <param name="store">
+    /// The idempotency store used to coordinate operation state.
+    /// </param>
+    /// <param name="serializer">
+    /// The serializer used to retain and replay completed operation results.
+    /// </param>
+    /// <param name="options">
+    /// The options that configure idempotency behavior.
+    /// </param>
+    /// <param name="timeProvider">
+    /// The time provider to use, or <see langword="null"/> to use
+    /// <see cref="TimeProvider.System"/>.
+    /// </param>
+    /// <returns>
+    /// A new idempotency service.
+    /// </returns>
     public static IdempotencyService Create(
         IIdempotencyStore store,
         IIdempotencySerializer serializer,
@@ -70,8 +147,6 @@ public sealed class IdempotencyService
         ArgumentNullException.ThrowIfNull(store);
         ArgumentNullException.ThrowIfNull(serializer);
         ArgumentNullException.ThrowIfNull(options);
-
-        options.Validate();
 
         return new IdempotencyService(
             store,
@@ -100,14 +175,30 @@ public sealed class IdempotencyService
     /// If ownership of the key is lost before the requested state transition can be applied,
     /// an <see cref="IdempotencyLeaseLostException"/> is thrown.
     /// </remarks>
+    /// <typeparam name="T">
+    /// The type of value produced by the operation.
+    /// </typeparam>
+    /// <param name="key">
+    /// The idempotency key identifying the operation.
+    /// </param>
+    /// <param name="fingerprint">
+    /// The fingerprint used to determine whether reuse of the key represents the same operation.
+    /// </param>
+    /// <param name="operation">
+    /// The operation to execute after ownership of the key is acquired.
+    /// </param>
+    /// <param name="cancellationToken">
+    /// A token used to cancel idempotency processing.
+    /// </param>
+    /// <returns>
+    /// The result produced by the executed operation or replayed from a previously completed operation.
+    /// </returns>
     /// <exception cref="IdempotencyConflictException">
     /// Thrown when the idempotency key is already associated with a different operation.
     /// </exception>
-    ///
     /// <exception cref="IdempotencyInProgressException">
     /// Thrown when another operation currently owns the idempotency key.
     /// </exception>
-    ///
     /// <exception cref="IdempotencyLeaseLostException">
     /// Thrown when ownership of the idempotency key is lost before the requested state transition can be applied.
     /// </exception>
@@ -128,7 +219,8 @@ public sealed class IdempotencyService
             {
                 using var heartbeatStopCts = new CancellationTokenSource();
                 using var leaseLossCts = new CancellationTokenSource();
-                using var operationCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, leaseLossCts.Token);
+                using var operationCts =
+                    CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, leaseLossCts.Token);
 
                 Guid ownerToken = acquireResult.OwnerToken
                                   ?? throw new InvalidOperationException("Acquired result has no owner token.");
@@ -172,8 +264,7 @@ public sealed class IdempotencyService
                 {
                     await StopHeartbeatAsync(heartbeatStopCts, heartbeatTask);
                     await TryReleaseBestEffortAsync(key, ownerToken);
-                    throw new InvalidOperationException(
-                        "The idempotency operation returned a null result.");
+                    throw new InvalidOperationException("The idempotency operation returned a null result.");
                 }
 
                 bool transitionSucceeded;
@@ -185,14 +276,19 @@ public sealed class IdempotencyService
                         case IdempotencyOperationOutcome.Complete:
                         {
                             byte[] payload = _serializer.Serialize(operationResult.Value);
-                            transitionSucceeded = await _store.TryCompleteAsync(key, ownerToken, payload, CancellationToken.None);
+                            transitionSucceeded = await _store.TryCompleteAsync(
+                                key,
+                                ownerToken,
+                                payload,
+                                CancellationToken.None);
                             break;
                         }
                         case IdempotencyOperationOutcome.Release:
                             transitionSucceeded = await _store.TryReleaseAsync(key, ownerToken, CancellationToken.None);
                             break;
                         default:
-                            throw new InvalidOperationException("Unknown operation result");
+                            throw new InvalidOperationException(
+                                $"Unknown operation outcome: {operationResult.Outcome}");
                     }
                 }
                 catch
@@ -201,7 +297,8 @@ public sealed class IdempotencyService
                     throw;
                 }
 
-                ExceptionDispatchInfo? finalHeartbeatException = await StopHeartbeatAsync(heartbeatStopCts, heartbeatTask);
+                ExceptionDispatchInfo? finalHeartbeatException =
+                    await StopHeartbeatAsync(heartbeatStopCts, heartbeatTask);
 
                 if (transitionSucceeded)
                 {
@@ -214,7 +311,8 @@ public sealed class IdempotencyService
                             Emit(Released, new IdempotencyReleasedEvent(key));
                             break;
                         default:
-                            throw new InvalidOperationException("Unknown event");
+                            throw new InvalidOperationException(
+                                $"Unknown operation outcome: {operationResult.Outcome}");
                     }
 
                     return operationResult.Value;
@@ -243,7 +341,8 @@ public sealed class IdempotencyService
         }
     }
 
-    private static async Task<ExceptionDispatchInfo?> StopHeartbeatAsync(CancellationTokenSource heartbeatStopCts, Task heartbeatTask)
+    private static async Task<ExceptionDispatchInfo?> StopHeartbeatAsync(CancellationTokenSource heartbeatStopCts,
+        Task heartbeatTask)
     {
         await heartbeatStopCts.CancelAsync();
 
@@ -278,7 +377,10 @@ public sealed class IdempotencyService
         }
     }
 
-    private async Task RunLeaseHeartbeatAsync(IdempotencyKey key, Guid ownerToken, CancellationTokenSource leaseLostCts, CancellationToken cancellationToken)
+    private async Task RunLeaseHeartbeatAsync(IdempotencyKey key,
+        Guid ownerToken,
+        CancellationTokenSource leaseLostCts,
+        CancellationToken cancellationToken)
     {
         try
         {
