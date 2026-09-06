@@ -4,5 +4,5 @@ obj/
 riderModule.iml
 /_ReSharper.Caches/
 /.idea
-/docs/_site
-/docs/api
+docs/_site/
+docs/api/
