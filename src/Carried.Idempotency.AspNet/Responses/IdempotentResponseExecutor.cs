@@ -1,3 +1,5 @@
+using Carried.Idempotency.AspNet.Errors;
+using Microsoft.Net.Http.Headers;
 using Carried.Idempotency.AspNet.Observability;
 using Carried.Idempotency.AspNet.Policies;
 using Carried.Idempotency.IdempotencyOperation;
@@ -23,15 +25,17 @@ internal sealed class IdempotentResponseExecutor
         IdempotencyPolicy policy,
         RequestDelegate next)
     {
+        var isUnsupportedResponse = false;
         Stream originalBody = context.Response.Body;
 
         await using var responseBuffer =
             new MemoryStream();
 
-        context.Response.Body = responseBuffer;
+        await using var captureStream = new IdempotentResponseCaptureStream(responseBuffer, () => IsUnsupportedResponse(context.Response.ContentType));
+
+        context.Response.Body = captureStream;
 
         IdempotentHttpResponse? response;
-
         try
         {
             response = await idempotencyService.ExecuteAsync(
@@ -78,21 +82,27 @@ internal sealed class IdempotentResponseExecutor
                             headers,
                             body);
 
-                    ResponseRetentionResult retentionResult =
-                        GetRetentionResult(
+                    ResponseRetentionOutcome retentionOutcome =
+                        GetRetentionOutcome(
                             idempotentHttpResponse,
                             policy);
 
-                    _metrics?.RecordResponse(
-                        retentionResult.MetricResult);
+                    isUnsupportedResponse = retentionOutcome is ResponseRetentionOutcome.UnsupportedResponse;
 
-                    return retentionResult.ShouldStore
+                    _metrics?.RecordResponse(GetMetricResult(retentionOutcome));
+
+                    return retentionOutcome is ResponseRetentionOutcome.Retained
                         ? IdempotencyOperationResult<IdempotentHttpResponse>
                             .Complete(idempotentHttpResponse)
                         : IdempotencyOperationResult<IdempotentHttpResponse>
                             .Release(idempotentHttpResponse);
                 },
                 context.RequestAborted);
+        }
+        catch (UnsupportedIdempotentResponseException)
+        {
+            _metrics?.RecordResponse(IdempotencyMetricResults.UnsupportedResponse);
+            throw;
         }
         finally
         {
@@ -103,6 +113,11 @@ internal sealed class IdempotentResponseExecutor
         {
             throw new InvalidOperationException(
                 "The idempotency operation returned no HTTP response.");
+        }
+
+        if (isUnsupportedResponse)
+        {
+            throw new UnsupportedIdempotentResponseException();
         }
 
         context.Response.StatusCode =
@@ -121,54 +136,80 @@ internal sealed class IdempotentResponseExecutor
             context.RequestAborted);
     }
 
-    private static ResponseRetentionResult GetRetentionResult(
+    private static ResponseRetentionOutcome GetRetentionOutcome(
         IdempotentHttpResponse response,
         IdempotencyPolicy policy)
     {
-        string? rejectionReason =
+        if (IsUnsupportedResponse(response.ContentType))
+            return ResponseRetentionOutcome.UnsupportedResponse;
+
+        ResponseRetentionOutcome retentionOutcome =
             response.StatusCode switch
             {
-                >= 200 and < 400 => null,
+                >= 200 and < 400 => ResponseRetentionOutcome.Retained,
 
                 408 =>
-                    IdempotencyMetricResults.RequestTimeout,
+                    ResponseRetentionOutcome.RequestTimeout,
 
                 429 =>
-                    IdempotencyMetricResults.RateLimited,
+                    ResponseRetentionOutcome.RateLimited,
 
                 >= 400 and < 500 when !policy.StoreClientErrors =>
-                    IdempotencyMetricResults.ClientErrorPolicy,
+                    ResponseRetentionOutcome.ClientErrorPolicy,
 
-                >= 400 and < 500 => null,
+                >= 400 and < 500 => ResponseRetentionOutcome.Retained,
 
                 >= 500 and < 600 =>
-                    IdempotencyMetricResults.ServerError,
+                    ResponseRetentionOutcome.ServerError,
 
                 _ => throw new ArgumentOutOfRangeException(
                     nameof(response))
             };
 
-        if (rejectionReason is not null)
+        if (retentionOutcome is not ResponseRetentionOutcome.Retained)
         {
-            return new ResponseRetentionResult(
-                false,
-                rejectionReason);
+            return retentionOutcome;
         }
 
         if (response.Body.LongLength >
             policy.MaxRetainedResponseBodySize)
         {
-            return new ResponseRetentionResult(
-                false,
-                IdempotencyMetricResults.ResponseTooLarge);
+            return ResponseRetentionOutcome.ResponseTooLarge;
         }
 
-        return new ResponseRetentionResult(
-            true,
-            IdempotencyMetricResults.Retained);
+        return ResponseRetentionOutcome.Retained;
     }
 
-    private readonly record struct ResponseRetentionResult(
-        bool ShouldStore,
-        string MetricResult);
+    private static string GetMetricResult(ResponseRetentionOutcome outcome)
+    {
+        return outcome switch
+        {
+            ResponseRetentionOutcome.Retained => IdempotencyMetricResults.Retained,
+            ResponseRetentionOutcome.ServerError => IdempotencyMetricResults.ServerError,
+            ResponseRetentionOutcome.RequestTimeout => IdempotencyMetricResults.RequestTimeout,
+            ResponseRetentionOutcome.RateLimited => IdempotencyMetricResults.RateLimited,
+            ResponseRetentionOutcome.ClientErrorPolicy => IdempotencyMetricResults.ClientErrorPolicy,
+            ResponseRetentionOutcome.ResponseTooLarge => IdempotencyMetricResults.ResponseTooLarge,
+            ResponseRetentionOutcome.UnsupportedResponse => IdempotencyMetricResults.UnsupportedResponse,
+            _ => throw new ArgumentOutOfRangeException(nameof(outcome), outcome, null)
+        };
+    }
+
+    private static bool IsUnsupportedResponse(
+        string? contentType)
+    {
+        if (string.IsNullOrWhiteSpace(contentType))
+            return false;
+
+        if (!MediaTypeHeaderValue.TryParse(
+                contentType,
+                out MediaTypeHeaderValue? mediaType))
+        {
+            return false;
+        }
+
+        return mediaType.MediaType.Equals(
+            "text/event-stream",
+            StringComparison.OrdinalIgnoreCase);
+    }
 }

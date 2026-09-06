@@ -9,6 +9,7 @@ using Microsoft.Extensions.Hosting;
 
 namespace Carried.Idempotency.AspNet.Tests.Observability;
 
+[Collection("IdempotencyMetrics")]
 public sealed class IdempotentResponseMetricsTests
 {
     [Fact]
