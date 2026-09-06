@@ -1,6 +1,5 @@
 using System.Diagnostics.Metrics;
 using Carried.Idempotency.IdempotencyEvents;
-using Microsoft.Extensions.Hosting;
 
 namespace Carried.Idempotency.AspNet.Observability;
 

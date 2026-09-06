@@ -113,7 +113,8 @@ internal sealed class IdempotencyMiddleware
                 policy,
                 _next);
         }
-        catch (Exception exception) when (exception is IdempotencyConflictException or IdempotencyInProgressException or IdempotencyLeaseLostException)
+        catch (Exception exception) when (exception is IdempotencyConflictException or IdempotencyInProgressException or IdempotencyLeaseLostException
+                                              or UnsupportedIdempotentResponseException)
         {
             IdempotencyError idempotencyError = IdempotencyExceptionMapper.Map(exception);
             await idempotencyErrorResponseWriter.WriteAsync(context, idempotencyError, CancellationToken.None);

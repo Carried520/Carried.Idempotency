@@ -19,4 +19,7 @@ internal static class IdempotencyMetricResults
 
     internal const string ResponseTooLarge =
         "response_too_large";
+
+    internal const string UnsupportedResponse =
+        "unsupported_response";
 }
