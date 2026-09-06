@@ -12,11 +12,15 @@ public sealed partial class IdempotencyIntegrationTests
     [Fact]
     public async Task UnmarkedEndpoint_DoesNotRequireIdempotencyKey()
     {
-        var server = await IdempotencyTestServer.CreateAsync(endpoints =>
-        {
-            endpoints.MapPost("/orders", () =>
-                Results.Ok(new { Id = 1 }));
-        });
+        var server = await IdempotencyTestServer.CreateAsync(
+            opts => opts.UseInMemory(),
+            endpoints =>
+            {
+                endpoints.MapPost(
+                    "/orders",
+                    () =>
+                        Results.Ok(new { Id = 1 }));
+            });
 
         HttpResponseMessage response =
             await server.Client.PostAsync(
@@ -31,12 +35,16 @@ public sealed partial class IdempotencyIntegrationTests
     [Fact]
     public async Task MarkedEndpoint_WithoutIdempotencyKey_ReturnsBadRequest()
     {
-        var server = await IdempotencyTestServer.CreateAsync(endpoints =>
-        {
-            endpoints.MapPost("/orders", () =>
-                    Results.Ok())
-                .RequireIdempotency();
-        });
+        var server = await IdempotencyTestServer.CreateAsync(
+            opts => opts.UseInMemory(),
+            endpoints =>
+            {
+                endpoints.MapPost(
+                        "/orders",
+                        () =>
+                            Results.Ok())
+                    .RequireIdempotency();
+            });
 
         HttpResponseMessage response =
             await server.Client.PostAsync(
@@ -53,21 +61,25 @@ public sealed partial class IdempotencyIntegrationTests
     {
         var invocationCount = 0;
 
-        var server = await IdempotencyTestServer.CreateAsync(endpoints =>
-        {
-            endpoints.MapPost("/orders", () =>
-                {
-                    invocationCount++;
-
-                    return Results.Created(
-                        "/orders/123",
-                        new
+        var server = await IdempotencyTestServer.CreateAsync(
+            opts => opts.UseInMemory(),
+            endpoints =>
+            {
+                endpoints.MapPost(
+                        "/orders",
+                        () =>
                         {
-                            Id = 123
-                        });
-                })
-                .RequireIdempotency();
-        });
+                            invocationCount++;
+
+                            return Results.Created(
+                                "/orders/123",
+                                new
+                                {
+                                    Id = 123
+                                });
+                        })
+                    .RequireIdempotency();
+            });
 
         using HttpResponseMessage first =
             await SendAsync(
@@ -117,16 +129,20 @@ public sealed partial class IdempotencyIntegrationTests
     {
         var invocationCount = 0;
 
-        var server = await IdempotencyTestServer.CreateAsync(endpoints =>
-        {
-            endpoints.MapPost("/orders", () =>
-                {
-                    invocationCount++;
+        var server = await IdempotencyTestServer.CreateAsync(
+            opts => opts.UseInMemory(),
+            endpoints =>
+            {
+                endpoints.MapPost(
+                        "/orders",
+                        () =>
+                        {
+                            invocationCount++;
 
-                    return Results.Ok();
-                })
-                .RequireIdempotency();
-        });
+                            return Results.Ok();
+                        })
+                    .RequireIdempotency();
+            });
 
         using HttpResponseMessage first =
             await SendAsync(
@@ -166,16 +182,20 @@ public sealed partial class IdempotencyIntegrationTests
     {
         var invocationCount = 0;
 
-        var server = await IdempotencyTestServer.CreateAsync(endpoints =>
-        {
-            endpoints.MapPost("/orders", () =>
-                {
-                    invocationCount++;
+        var server = await IdempotencyTestServer.CreateAsync(
+            opts => opts.UseInMemory(),
+            endpoints =>
+            {
+                endpoints.MapPost(
+                        "/orders",
+                        () =>
+                        {
+                            invocationCount++;
 
-                    return Results.Ok();
-                })
-                .RequireIdempotency();
-        });
+                            return Results.Ok();
+                        })
+                    .RequireIdempotency();
+            });
 
         using HttpResponseMessage first =
             await SendAsync(
@@ -207,19 +227,24 @@ public sealed partial class IdempotencyIntegrationTests
     {
         var invocationCount = 0;
 
-        var server = await IdempotencyTestServer.CreateAsync(endpoints =>
-        {
-            endpoints.MapPost("/orders/{id:int}", (int id) =>
-                {
-                    invocationCount++;
+        var server = await IdempotencyTestServer.CreateAsync(
+            opts => opts.UseInMemory(),
+            endpoints =>
+            {
+                endpoints.MapPost(
+                        "/orders/{id:int}",
+                        (int id) =>
+                        {
+                            invocationCount++;
 
-                    return Results.Ok(new
-                    {
-                        Id = id
-                    });
-                })
-                .RequireIdempotency();
-        });
+                            return Results.Ok(
+                                new
+                                {
+                                    Id = id
+                                });
+                        })
+                    .RequireIdempotency();
+            });
 
         using HttpResponseMessage first =
             await SendAsync(
@@ -250,30 +275,31 @@ public sealed partial class IdempotencyIntegrationTests
     public async Task SameKeyWhileFirstRequestIsRunning_ReturnsInProgress()
     {
         var enteredEndpoint =
-            new TaskCompletionSource(
-                TaskCreationOptions.RunContinuationsAsynchronously);
+            new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
 
         var releaseEndpoint =
-            new TaskCompletionSource(
-                TaskCreationOptions.RunContinuationsAsynchronously);
+            new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
 
         var invocationCount = 0;
 
-        var server = await IdempotencyTestServer.CreateAsync(endpoints =>
-        {
-            endpoints.MapPost("/orders", async () =>
-                {
-                    Interlocked.Increment(
-                        ref invocationCount);
+        var server = await IdempotencyTestServer.CreateAsync(
+            opts => opts.UseInMemory(),
+            endpoints =>
+            {
+                endpoints.MapPost(
+                        "/orders",
+                        async () =>
+                        {
+                            Interlocked.Increment(ref invocationCount);
 
-                    enteredEndpoint.SetResult();
+                            enteredEndpoint.SetResult();
 
-                    await releaseEndpoint.Task;
+                            await releaseEndpoint.Task;
 
-                    return Results.Ok();
-                })
-                .RequireIdempotency();
-        });
+                            return Results.Ok();
+                        })
+                    .RequireIdempotency();
+            });
 
         Task<HttpResponseMessage> firstRequest =
             SendAsync(
@@ -306,25 +332,28 @@ public sealed partial class IdempotencyIntegrationTests
             HttpStatusCode.OK,
             first.StatusCode);
     }
-    
-    
-    
+
+
     [Fact]
     public async Task ReplayedResponse_PreservesAllowedHeaders()
     {
-        var server = await IdempotencyTestServer.CreateAsync(endpoints =>
-        {
-            endpoints.MapPost("/orders", (HttpContext context) =>
-                {
-                    context.Response.Headers.ETag = "\"abc\"";
-                    context.Response.Headers.CacheControl = "no-cache";
+        var server = await IdempotencyTestServer.CreateAsync(
+            opts => opts.UseInMemory(),
+            endpoints =>
+            {
+                endpoints.MapPost(
+                        "/orders",
+                        (HttpContext context) =>
+                        {
+                            context.Response.Headers.ETag = "\"abc\"";
+                            context.Response.Headers.CacheControl = "no-cache";
 
-                    return Results.Created(
-                        "/orders/123",
-                        new { Id = 123 });
-                })
-                .RequireIdempotency();
-        });
+                            return Results.Created(
+                                "/orders/123",
+                                new { Id = 123 });
+                        })
+                    .RequireIdempotency();
+            });
 
         using HttpResponseMessage first =
             await SendAsync(
@@ -352,22 +381,26 @@ public sealed partial class IdempotencyIntegrationTests
             first.Headers.Location,
             second.Headers.Location);
     }
-    
-    
+
+
     [Fact]
     public async Task QueryParameterOrder_DoesNotChangeFingerprint()
     {
         var invocationCount = 0;
 
-        var server = await IdempotencyTestServer.CreateAsync(endpoints =>
-        {
-            endpoints.MapPost("/orders", () =>
-                {
-                    invocationCount++;
-                    return Results.Ok();
-                })
-                .RequireIdempotency();
-        });
+        var server = await IdempotencyTestServer.CreateAsync(
+            opts => opts.UseInMemory(),
+            endpoints =>
+            {
+                endpoints.MapPost(
+                        "/orders",
+                        () =>
+                        {
+                            invocationCount++;
+                            return Results.Ok();
+                        })
+                    .RequireIdempotency();
+            });
 
         using HttpResponseMessage first =
             await SendAsync(

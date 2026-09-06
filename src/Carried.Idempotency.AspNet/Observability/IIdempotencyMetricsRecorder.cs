@@ -1,6 +1,6 @@
 namespace Carried.Idempotency.AspNet.Observability;
 
-public interface IIdempotencyMetricsRecorder
+internal interface IIdempotencyMetricsRecorder
 {
     void RecordResponse(string result);
 }

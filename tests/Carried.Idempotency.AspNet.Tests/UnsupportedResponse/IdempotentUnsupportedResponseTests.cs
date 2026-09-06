@@ -246,7 +246,7 @@ public sealed class IdempotentUnsupportedResponseTests
 
         builder.WebHost.UseTestServer();
 
-        builder.Services.AddIdempotency();
+        builder.Services.AddIdempotency(opts => opts.UseInMemory());
 
         if (addMetrics)
         {

@@ -3,7 +3,7 @@ using Microsoft.Extensions.Primitives;
 
 namespace Carried.Idempotency.AspNet.Fingerprinting;
 
-public sealed class HeaderFingerprintContributor : IIdempotencyFingerprintContributor
+internal sealed class HeaderFingerprintContributor : IIdempotencyFingerprintContributor
 {
     private readonly string _headerName;
 
@@ -19,6 +19,8 @@ public sealed class HeaderFingerprintContributor : IIdempotencyFingerprintContri
 
     public ValueTask<string?> GetValueAsync(HttpContext context, CancellationToken cancellationToken = default)
     {
+        ArgumentNullException.ThrowIfNull(context);
+
         if (!context.Request.Headers.TryGetValue(_headerName, out StringValues values))
         {
             return ValueTask.FromResult<string?>(null);

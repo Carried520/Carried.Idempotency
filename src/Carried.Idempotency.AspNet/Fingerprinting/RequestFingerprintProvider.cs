@@ -13,12 +13,16 @@ internal static class RequestFingerprintProvider
 
     public static async Task<string> CreateAsync(
         HttpContext context,
-        string? routePattern, IEnumerable<IIdempotencyFingerprintContributor> contributors, CancellationToken cancellationToken = default)
+        string? routePattern,
+        IEnumerable<IIdempotencyFingerprintContributor> contributors,
+        CancellationToken cancellationToken = default)
     {
+        ArgumentNullException.ThrowIfNull(context);
+        ArgumentNullException.ThrowIfNull(contributors);
+
         if (string.IsNullOrWhiteSpace(routePattern))
         {
-            throw new InvalidOperationException(
-                "Idempotency requires a route pattern.");
+            throw new InvalidOperationException("Idempotency requires a route pattern.");
         }
 
         using var hash =
@@ -28,7 +32,7 @@ internal static class RequestFingerprintProvider
         Append(hash, routePattern);
 
         foreach (KeyValuePair<string, object?> routeValue in
-                 context.Request.RouteValues.OrderBy(x => x.Key))
+                 context.Request.RouteValues.OrderBy(x => x.Key, StringComparer.Ordinal))
         {
             Append(hash, routeValue.Key);
             Append(
@@ -37,7 +41,7 @@ internal static class RequestFingerprintProvider
         }
 
         foreach (KeyValuePair<string, StringValues> queryParameter in
-                 context.Request.Query.OrderBy(x => x.Key))
+                 context.Request.Query.OrderBy(x => x.Key, StringComparer.Ordinal))
         {
             Append(hash, queryParameter.Key);
 
@@ -64,8 +68,7 @@ internal static class RequestFingerprintProvider
                            buffer,
                            cancellationToken)) > 0)
             {
-                hash.AppendData(
-                    buffer.AsSpan(0, bytesRead));
+                hash.AppendData(buffer.AsSpan(0, bytesRead));
             }
         }
         finally
@@ -73,11 +76,12 @@ internal static class RequestFingerprintProvider
             context.Request.Body.Position = 0;
         }
 
-        IOrderedEnumerable<IIdempotencyFingerprintContributor> sortedContributorsByName = contributors.OrderBy(x => x.Name, StringComparer.Ordinal);
-        foreach (IIdempotencyFingerprintContributor sortedContributor in sortedContributorsByName)
+        foreach (IIdempotencyFingerprintContributor contributor in contributors.OrderBy(
+                     x => x.Name,
+                     StringComparer.Ordinal))
         {
-            string? contributorValue = await sortedContributor.GetValueAsync(context, cancellationToken);
-            Append(hash, sortedContributor.Name);
+            string? contributorValue = await contributor.GetValueAsync(context, cancellationToken);
+            Append(hash, contributor.Name);
 
             if (contributorValue is null)
             {
@@ -96,6 +100,8 @@ internal static class RequestFingerprintProvider
         return Convert.ToHexString(fingerprintBytes);
     }
 
+    // Prefix each string with its byte length so distinct sequences
+    // cannot produce the same canonical byte stream by concatenation.
     private static void Append(
         IncrementalHash hash,
         string value)

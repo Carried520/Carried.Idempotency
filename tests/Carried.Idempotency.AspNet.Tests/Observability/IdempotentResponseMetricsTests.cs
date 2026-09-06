@@ -415,7 +415,7 @@ public sealed class IdempotentResponseMetricsTests
         listener.Start();
 
         using IHost host = Host.CreateDefaultBuilder()
-            .ConfigureServices(services => { services.AddIdempotency(); })
+            .ConfigureServices(services => { services.AddIdempotency(opts => opts.UseInMemory()); })
             .Build();
 
         await host.StartAsync();
@@ -456,7 +456,7 @@ public sealed class IdempotentResponseMetricsTests
         return Host.CreateDefaultBuilder()
             .ConfigureServices(services =>
             {
-                services.AddIdempotency();
+                services.AddIdempotency(opts => opts.UseInMemory());
                 services.AddIdempotencyMetrics();
             })
             .Build();

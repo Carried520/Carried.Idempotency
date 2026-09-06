@@ -358,8 +358,9 @@ public async Task StartAsync_InvalidHeaderName_Fails()
     builder.WebHost.UseTestServer();
 
     builder.Services.AddIdempotency(
-        configureAspNetOptions: options =>
+        options =>
         {
+            options.UseInMemory();
             options.HeaderName = "bad header";
         });
 
@@ -379,8 +380,9 @@ public async Task StartAsync_InvalidDefaultPolicy_Fails()
     builder.WebHost.UseTestServer();
 
     builder.Services.AddIdempotency(
-        configureAspNetOptions: options =>
+        options =>
         {
+            options.UseInMemory();
             options.DefaultPolicy.MaxKeyLength = 0;
         });
 
@@ -400,8 +402,9 @@ public async Task StartAsync_ValidOptions_Succeeds()
     builder.WebHost.UseTestServer();
 
     builder.Services.AddIdempotency(
-        configureAspNetOptions: options =>
+        options =>
         {
+            options.UseInMemory();
             options.HeaderName =
                 "X-Idempotency-Key";
         });

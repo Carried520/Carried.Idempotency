@@ -8,10 +8,12 @@ internal static class IdempotencyPolicyValidator
         IdempotencyPolicy policy,
         string path)
     {
+        ArgumentNullException.ThrowIfNull(policy);
+        ArgumentException.ThrowIfNullOrWhiteSpace(path);
+        
         if (policy.MaxKeyLength <= 0)
         {
-            yield return
-                $"{path}.MaxKeyLength must be greater than zero.";
+            yield return $"{path}.MaxKeyLength must be greater than zero.";
         }
 
         if (policy.MaxRetainedResponseBodySize < 0)
@@ -24,17 +26,14 @@ internal static class IdempotencyPolicyValidator
         {
             if (string.IsNullOrWhiteSpace(replayHeader))
             {
-                yield return
-                    $"{path}.ReplayHeaders cannot contain empty or whitespace header names.";
+                yield return $"{path}.ReplayHeaders cannot contain empty or whitespace header names.";
 
                 continue;
             }
 
-            if (!HttpHeaderNameValidator.IsValid(
-                    replayHeader))
+            if (!HttpHeaderNameValidator.IsValid(replayHeader))
             {
-                yield return
-                    $"{path}.ReplayHeaders contains invalid HTTP header name '{replayHeader}'.";
+                yield return $"{path}.ReplayHeaders contains invalid HTTP header name '{replayHeader}'.";
             }
         }
     }

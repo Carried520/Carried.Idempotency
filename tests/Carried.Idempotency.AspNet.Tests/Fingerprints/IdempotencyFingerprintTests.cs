@@ -426,7 +426,7 @@ public sealed class IdempotencyFingerprintCustomizationTests
         HostApplicationBuilder builder =
             Host.CreateApplicationBuilder();
 
-        builder.Services.AddIdempotency();
+        builder.Services.AddIdempotency(opts => opts.UseInMemory());
 
         builder.Services.AddIdempotencyFingerprintHeader(
             "X-Tenant-Id");
@@ -452,7 +452,7 @@ public sealed class IdempotencyFingerprintCustomizationTests
         HostApplicationBuilder builder =
             Host.CreateApplicationBuilder();
 
-        builder.Services.AddIdempotency();
+        builder.Services.AddIdempotency(opts => opts.UseInMemory());
 
         builder.Services.AddIdempotencyFingerprintContributor<
             NullNameFingerprintContributor>();
@@ -475,7 +475,7 @@ public sealed class IdempotencyFingerprintCustomizationTests
         HostApplicationBuilder builder =
             Host.CreateApplicationBuilder();
 
-        builder.Services.AddIdempotency();
+        builder.Services.AddIdempotency(opts => opts.UseInMemory());
 
         builder.Services.AddIdempotencyFingerprintContributor<
             WhitespaceNameFingerprintContributor>();
