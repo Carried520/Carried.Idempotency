@@ -1,0 +1,60 @@
+name: Publish NuGet Packages
+
+on:
+  push:
+    tags:
+      - "v*.*.*"
+
+permissions:
+  contents: read
+
+jobs:
+  publish:
+    name: Build, Test and Publish
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v5
+        with:
+          dotnet-version: "10.0.x"
+
+      - name: Get package version
+        id: version
+        shell: bash
+        run: echo "version=${GITHUB_REF_NAME#v}" >> "$GITHUB_OUTPUT"
+
+      - name: Restore
+        run: dotnet restore
+
+      - name: Build
+        run: dotnet build --configuration Release --no-restore
+
+      - name: Test
+        run: dotnet test --configuration Release --no-build
+
+      - name: Pack Core
+        run: >
+          dotnet pack src/Carried.Idempotency/Carried.Idempotency.csproj
+          --configuration Release
+          --no-build
+          --output ./artifacts
+          -p:PackageVersion=${{ steps.version.outputs.version }}
+
+      - name: Pack ASP.NET Core
+        run: >
+          dotnet pack src/Carried.Idempotency.AspNet/Carried.Idempotency.AspNet.csproj
+          --configuration Release
+          --no-build
+          --output ./artifacts
+          -p:PackageVersion=${{ steps.version.outputs.version }}
+
+      - name: Publish to NuGet
+        run: >
+          dotnet nuget push "./artifacts/*.nupkg"
+          --api-key "${{ secrets.NUGET_API_KEY }}"
+          --source "https://api.nuget.org/v3/index.json"
+          --skip-duplicate
