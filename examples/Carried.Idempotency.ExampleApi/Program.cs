@@ -7,7 +7,16 @@ WebApplicationBuilder builder = WebApplication.CreateBuilder(args);
 builder.Services.AddControllers();
 builder.Services.AddOpenApi();
 
-builder.Services.AddIdempotency(options => { options.UseInMemory(); });
+builder.Services.AddIdempotency(options =>
+{
+    options.UseInMemory();
+    options.HeaderName = "Default-Key-Name";
+    options.AddPolicy("strict" ,
+        policy =>
+        {
+            policy.MaxKeyLength = 255;
+        });
+});
 
 builder.Services.AddIdempotencyOpenApi();
 builder.Services.AddIdempotencyLogging();
