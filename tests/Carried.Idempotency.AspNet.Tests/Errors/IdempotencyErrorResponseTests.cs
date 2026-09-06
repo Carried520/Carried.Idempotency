@@ -18,6 +18,7 @@ public sealed class IdempotencyErrorResponseTests
     {
         await using IdempotencyTestServer server =
             await IdempotencyTestServer.CreateAsync(
+                opts => opts.UseInMemory(),
                 configureEndpoints: endpoints =>
                 {
                     endpoints.MapPost(
@@ -68,6 +69,7 @@ public sealed class IdempotencyErrorResponseTests
     {
         await using IdempotencyTestServer server =
             await IdempotencyTestServer.CreateAsync(
+                opts => opts.UseInMemory(),
                 configureEndpoints: endpoints =>
                 {
                     endpoints.MapPost(
@@ -75,8 +77,7 @@ public sealed class IdempotencyErrorResponseTests
                             async (HttpContext context) =>
                             {
                                 using var reader =
-                                    new StreamReader(
-                                        context.Request.Body);
+                                    new StreamReader(context.Request.Body);
 
                                 string body =
                                     await reader.ReadToEndAsync();
@@ -103,8 +104,7 @@ public sealed class IdempotencyErrorResponseTests
                 });
 
         HttpResponseMessage firstResponse =
-            await server.Client.SendAsync(
-                firstRequest);
+            await server.Client.SendAsync(firstRequest);
 
         Assert.Equal(
             HttpStatusCode.OK,
@@ -127,8 +127,7 @@ public sealed class IdempotencyErrorResponseTests
                 });
 
         HttpResponseMessage secondResponse =
-            await server.Client.SendAsync(
-                secondRequest);
+            await server.Client.SendAsync(secondRequest);
 
         Assert.Equal(
             HttpStatusCode.Conflict,
@@ -148,8 +147,7 @@ public sealed class IdempotencyErrorResponseTests
             "Idempotency request failed.",
             problemDetails.Title);
 
-        Assert.NotNull(
-            problemDetails.Detail);
+        Assert.NotNull(problemDetails.Detail);
 
         Assert.True(
             problemDetails.Extensions.TryGetValue(
@@ -166,6 +164,7 @@ public sealed class IdempotencyErrorResponseTests
     {
         await using IdempotencyTestServer server =
             await IdempotencyTestServer.CreateAsync(
+                opts => opts.UseInMemory(),
                 configureEndpoints: endpoints =>
                 {
                     endpoints.MapPost(
@@ -213,9 +212,9 @@ public sealed class IdempotencyErrorResponseTests
                 stringValue,
 
             JsonElement
-            {
-                ValueKind: JsonValueKind.String
-            } element =>
+                {
+                    ValueKind: JsonValueKind.String
+                } element =>
                 element.GetString(),
 
             _ =>

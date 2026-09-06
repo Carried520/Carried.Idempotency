@@ -1,26 +1,38 @@
-using Carried.Idempotency.AspNet.Metadata;
-using Microsoft.AspNetCore.Builder;
+    using Carried.Idempotency.AspNet.Metadata;
+    using Microsoft.AspNetCore.Builder;
 
-namespace Carried.Idempotency.AspNet.Extensions;
+    namespace Carried.Idempotency.AspNet.Extensions;
 
-public static class IdempotencyEndpointConventionBuilderExtensions
-{
-    extension<TBuilder>(TBuilder builder) where TBuilder : IEndpointConventionBuilder
+    /// <summary>
+    /// Provides extension methods for requiring idempotency on ASP.NET Core endpoints.
+    /// </summary>
+    public static class IdempotencyEndpointConventionBuilderExtensions
     {
-        public TBuilder RequireIdempotency()
+        extension<TBuilder>(TBuilder builder) where TBuilder : IEndpointConventionBuilder
         {
-            builder.Add(endpointBuilder => { endpointBuilder.Metadata.Add(new IdempotencyMetadata()); });
+            /// <summary>
+            /// Requires idempotency using default idempotency policy.
+            /// </summary>
+            /// <returns>The endpoint convention builder.</returns>
+            public TBuilder RequireIdempotency()
+            {
+                builder.Add(endpointBuilder => { endpointBuilder.Metadata.Add(new IdempotencyMetadata()); });
 
-            return builder;
-        }
+                return builder;
+            }
 
-        public TBuilder RequireIdempotency(string policyName)
-        {
-            ArgumentException.ThrowIfNullOrWhiteSpace(policyName);
+            /// <summary>
+            /// Requires idempotency using the specified name policy.
+            /// </summary>
+            /// <param name="policyName">The name of idempotency policy to use.</param>
+            /// <returns>The endpoint convention builder.</returns>
+            public TBuilder RequireIdempotency(string policyName)
+            {
+                ArgumentException.ThrowIfNullOrWhiteSpace(policyName);
 
-            builder.Add(endpointBuilder => { endpointBuilder.Metadata.Add(new IdempotencyMetadata(policyName)); });
+                builder.Add(endpointBuilder => { endpointBuilder.Metadata.Add(new IdempotencyMetadata(policyName)); });
 
-            return builder;
+                return builder;
+            }
         }
     }
-}

@@ -15,15 +15,14 @@ public sealed class IdempotencyMetricsTests
     [Fact]
     public async Task StartAsync_CompletedOperation_RecordsAcquiredAndCompleted()
     {
-        IdempotencyService service = IdempotencyService.CreateInMemory(
-            new IdempotencyOptions());
+        IdempotencyService service = IdempotencyService.CreateInMemory(new IdempotencyOptions());
 
         using var metrics = new IdempotencyMetrics(service);
         using var listener = new TestMeterListener();
 
         listener.Start();
 
-        await metrics.StartAsync(CancellationToken.None);
+        metrics.Start();
 
         var key = new IdempotencyKey(
             "POST:/orders",
@@ -32,8 +31,7 @@ public sealed class IdempotencyMetricsTests
         await service.ExecuteAsync(
             key,
             "secret-fingerprint",
-            _ => Task.FromResult(
-                IdempotencyOperationResult<string>.Complete("result")));
+            _ => Task.FromResult(IdempotencyOperationResult<string>.Complete("result")));
 
         Assert.Collection(
             listener.Measurements,
@@ -60,15 +58,14 @@ public sealed class IdempotencyMetricsTests
     [Fact]
     public async Task StartAsync_CompletedEntry_RecordsReplayed()
     {
-        IdempotencyService service = IdempotencyService.CreateInMemory(
-            new IdempotencyOptions());
+        IdempotencyService service = IdempotencyService.CreateInMemory(new IdempotencyOptions());
 
         using var metrics = new IdempotencyMetrics(service);
         using var listener = new TestMeterListener();
 
         listener.Start();
 
-        await metrics.StartAsync(CancellationToken.None);
+        metrics.Start();
 
         var key = new IdempotencyKey(
             "POST:/orders",
@@ -77,16 +74,14 @@ public sealed class IdempotencyMetricsTests
         await service.ExecuteAsync(
             key,
             "fingerprint",
-            _ => Task.FromResult(
-                IdempotencyOperationResult<string>.Complete("result")));
+            _ => Task.FromResult(IdempotencyOperationResult<string>.Complete("result")));
 
         listener.Clear();
 
         await service.ExecuteAsync(
             key,
             "fingerprint",
-            _ => Task.FromResult(
-                IdempotencyOperationResult<string>.Complete("other")));
+            _ => Task.FromResult(IdempotencyOperationResult<string>.Complete("other")));
 
         MetricMeasurement replayed =
             Assert.Single(listener.Measurements);
@@ -102,15 +97,14 @@ public sealed class IdempotencyMetricsTests
     [Fact]
     public async Task StartAsync_Conflict_RecordsConflict()
     {
-        IdempotencyService service = IdempotencyService.CreateInMemory(
-            new IdempotencyOptions());
+        IdempotencyService service = IdempotencyService.CreateInMemory(new IdempotencyOptions());
 
         using var metrics = new IdempotencyMetrics(service);
         using var listener = new TestMeterListener();
 
         listener.Start();
 
-        await metrics.StartAsync(CancellationToken.None);
+        metrics.Start();
 
         var key = new IdempotencyKey(
             "POST:/orders",
@@ -119,17 +113,14 @@ public sealed class IdempotencyMetricsTests
         await service.ExecuteAsync(
             key,
             "fingerprint-1",
-            _ => Task.FromResult(
-                IdempotencyOperationResult<string>.Complete("result")));
+            _ => Task.FromResult(IdempotencyOperationResult<string>.Complete("result")));
 
         listener.Clear();
 
-        await Assert.ThrowsAsync<IdempotencyConflictException>(
-            () => service.ExecuteAsync(
-                key,
-                "fingerprint-2",
-                _ => Task.FromResult(
-                    IdempotencyOperationResult<string>.Complete("other"))));
+        await Assert.ThrowsAsync<IdempotencyConflictException>(() => service.ExecuteAsync(
+            key,
+            "fingerprint-2",
+            _ => Task.FromResult(IdempotencyOperationResult<string>.Complete("other"))));
 
         MetricMeasurement conflict =
             Assert.Single(listener.Measurements);
@@ -145,15 +136,14 @@ public sealed class IdempotencyMetricsTests
     [Fact]
     public async Task StartAsync_ReleasedOperation_RecordsAcquiredAndReleased()
     {
-        IdempotencyService service = IdempotencyService.CreateInMemory(
-            new IdempotencyOptions());
+        IdempotencyService service = IdempotencyService.CreateInMemory(new IdempotencyOptions());
 
         using var metrics = new IdempotencyMetrics(service);
         using var listener = new TestMeterListener();
 
         listener.Start();
 
-        await metrics.StartAsync(CancellationToken.None);
+        metrics.Start();
 
         var key = new IdempotencyKey(
             "POST:/orders",
@@ -162,8 +152,7 @@ public sealed class IdempotencyMetricsTests
         await service.ExecuteAsync(
             key,
             "fingerprint",
-            _ => Task.FromResult(
-                IdempotencyOperationResult<string>.Release("result")));
+            _ => Task.FromResult(IdempotencyOperationResult<string>.Release("result")));
 
         Assert.Collection(
             listener.Measurements,
@@ -190,16 +179,15 @@ public sealed class IdempotencyMetricsTests
     [Fact]
     public async Task StopAsync_UnsubscribesFromLifecycleEvents()
     {
-        IdempotencyService service = IdempotencyService.CreateInMemory(
-            new IdempotencyOptions());
+        IdempotencyService service = IdempotencyService.CreateInMemory(new IdempotencyOptions());
 
         using var metrics = new IdempotencyMetrics(service);
         using var listener = new TestMeterListener();
 
         listener.Start();
 
-        await metrics.StartAsync(CancellationToken.None);
-        await metrics.StopAsync(CancellationToken.None);
+        metrics.Start();
+        metrics.Stop();
 
         var key = new IdempotencyKey(
             "POST:/orders",
@@ -208,8 +196,7 @@ public sealed class IdempotencyMetricsTests
         await service.ExecuteAsync(
             key,
             "fingerprint",
-            _ => Task.FromResult(
-                IdempotencyOperationResult<string>.Complete("result")));
+            _ => Task.FromResult(IdempotencyOperationResult<string>.Complete("result")));
 
         Assert.Empty(listener.Measurements);
     }
@@ -217,15 +204,14 @@ public sealed class IdempotencyMetricsTests
     [Fact]
     public async Task Measurements_ContainOnlyOutcomeTag()
     {
-        IdempotencyService service = IdempotencyService.CreateInMemory(
-            new IdempotencyOptions());
+        IdempotencyService service = IdempotencyService.CreateInMemory(new IdempotencyOptions());
 
         using var metrics = new IdempotencyMetrics(service);
         using var listener = new TestMeterListener();
 
         listener.Start();
 
-        await metrics.StartAsync(CancellationToken.None);
+        metrics.Start();
 
         var key = new IdempotencyKey(
             "secret-scope",
@@ -234,8 +220,7 @@ public sealed class IdempotencyMetricsTests
         await service.ExecuteAsync(
             key,
             "secret-fingerprint",
-            _ => Task.FromResult(
-                IdempotencyOperationResult<string>.Complete("result")));
+            _ => Task.FromResult(IdempotencyOperationResult<string>.Complete("result")));
 
         Assert.NotEmpty(listener.Measurements);
 
@@ -265,7 +250,7 @@ public sealed class IdempotencyMetricsTests
         using IHost host = Host.CreateDefaultBuilder()
             .ConfigureServices(services =>
             {
-                services.AddIdempotency();
+                services.AddIdempotency(opts => opts.UseInMemory());
                 services.AddIdempotencyMetrics();
             })
             .Build();
@@ -282,8 +267,7 @@ public sealed class IdempotencyMetricsTests
         await service.ExecuteAsync(
             key,
             "fingerprint",
-            _ => Task.FromResult(
-                IdempotencyOperationResult<string>.Complete("result")));
+            _ => Task.FromResult(IdempotencyOperationResult<string>.Complete("result")));
 
         Assert.Contains(
             listener.Measurements,
@@ -310,10 +294,7 @@ public sealed class IdempotencyMetricsTests
         listener.Start();
 
         using IHost host = Host.CreateDefaultBuilder()
-            .ConfigureServices(services =>
-            {
-                services.AddIdempotency();
-            })
+            .ConfigureServices(services => { services.AddIdempotency(opts => opts.UseInMemory()); })
             .Build();
 
         await host.StartAsync();
@@ -328,8 +309,7 @@ public sealed class IdempotencyMetricsTests
         await service.ExecuteAsync(
             key,
             "fingerprint",
-            _ => Task.FromResult(
-                IdempotencyOperationResult<string>.Complete("result")));
+            _ => Task.FromResult(IdempotencyOperationResult<string>.Complete("result")));
 
         Assert.Empty(listener.Measurements);
 
@@ -363,18 +343,17 @@ public sealed class IdempotencyMetricsTests
                 }
             };
 
-            _listener.SetMeasurementEventCallback<long>(
-                (instrument, measurement, tags, state) =>
+            _listener.SetMeasurementEventCallback<long>((instrument, measurement, tags, state) =>
+            {
+                lock (_lock)
                 {
-                    lock (_lock)
-                    {
-                        _measurements.Add(
-                            new MetricMeasurement(
-                                instrument.Name,
-                                measurement,
-                                tags.ToArray()));
-                    }
-                });
+                    _measurements.Add(
+                        new MetricMeasurement(
+                            instrument.Name,
+                            measurement,
+                            tags.ToArray()));
+                }
+            });
         }
 
         public void Start()

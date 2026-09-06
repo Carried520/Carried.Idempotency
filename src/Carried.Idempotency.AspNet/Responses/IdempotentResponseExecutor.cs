@@ -1,10 +1,10 @@
 using Carried.Idempotency.AspNet.Errors;
-using Microsoft.Net.Http.Headers;
 using Carried.Idempotency.AspNet.Observability;
 using Carried.Idempotency.AspNet.Policies;
 using Carried.Idempotency.IdempotencyOperation;
 using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Primitives;
+using Microsoft.Net.Http.Headers;
 
 namespace Carried.Idempotency.AspNet.Responses;
 
@@ -25,13 +25,14 @@ internal sealed class IdempotentResponseExecutor
         IdempotencyPolicy policy,
         RequestDelegate next)
     {
-        var isUnsupportedResponse = false;
         Stream originalBody = context.Response.Body;
 
         await using var responseBuffer =
             new MemoryStream();
 
-        await using var captureStream = new IdempotentResponseCaptureStream(responseBuffer, () => IsUnsupportedResponse(context.Response.ContentType));
+        await using var captureStream = new IdempotentResponseCaptureStream(
+            responseBuffer,
+            () => IsUnsupportedResponse(context.Response.ContentType));
 
         context.Response.Body = captureStream;
 
@@ -62,8 +63,7 @@ internal sealed class IdempotentResponseExecutor
                     byte[] body =
                         responseBuffer.ToArray();
 
-                    var headers = new Dictionary<string, string[]>(
-                        StringComparer.OrdinalIgnoreCase);
+                    var headers = new Dictionary<string, string[]>(StringComparer.OrdinalIgnoreCase);
 
                     foreach (KeyValuePair<string, StringValues> header
                              in context.Response.Headers)
@@ -87,8 +87,6 @@ internal sealed class IdempotentResponseExecutor
                             idempotentHttpResponse,
                             policy);
 
-                    isUnsupportedResponse = retentionOutcome is ResponseRetentionOutcome.UnsupportedResponse;
-
                     _metrics?.RecordResponse(GetMetricResult(retentionOutcome));
 
                     return retentionOutcome is ResponseRetentionOutcome.Retained
@@ -111,11 +109,10 @@ internal sealed class IdempotentResponseExecutor
 
         if (response is null)
         {
-            throw new InvalidOperationException(
-                "The idempotency operation returned no HTTP response.");
+            throw new InvalidOperationException("The idempotency operation returned no HTTP response.");
         }
 
-        if (isUnsupportedResponse)
+        if (IsUnsupportedResponse(response.ContentType))
         {
             throw new UnsupportedIdempotentResponseException();
         }
@@ -163,7 +160,9 @@ internal sealed class IdempotentResponseExecutor
                     ResponseRetentionOutcome.ServerError,
 
                 _ => throw new ArgumentOutOfRangeException(
-                    nameof(response))
+                    nameof(response.StatusCode),
+                    response.StatusCode,
+                    "HTTP status must be between 200 and 599.")
             };
 
         if (retentionOutcome is not ResponseRetentionOutcome.Retained)

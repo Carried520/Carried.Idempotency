@@ -2,9 +2,8 @@ using Carried.Idempotency.AspNet.Extensions;
 using Carried.Idempotency.AspNet.Tests.TestServer;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
-using Xunit;
 
-namespace Carried.Idempotency.AspNet.Tests;
+namespace Carried.Idempotency.AspNet.Tests.Policy;
 
 public sealed class IdempotencyPolicyTests
 {
@@ -17,11 +16,14 @@ public sealed class IdempotencyPolicyTests
                 {
                     endpoints.MapPost(
                             "/test",
-                            () => Results.StatusCode(
-                                StatusCodes.Status400BadRequest))
+                            () => Results.StatusCode(StatusCodes.Status400BadRequest))
                         .RequireIdempotency();
                 },
-                configureAspNetOptions: options => { options.DefaultPolicy.StoreClientErrors = false; });
+                configureAspNetOptions: options =>
+                {
+                    options.DefaultPolicy.StoreClientErrors = false;
+                    options.UseInMemory();
+                });
 
         using var firstRequest =
             new HttpRequestMessage(
@@ -71,8 +73,7 @@ public sealed class IdempotencyPolicyTests
                             {
                                 executionCount++;
 
-                                return Results.StatusCode(
-                                    StatusCodes.Status400BadRequest);
+                                return Results.StatusCode(StatusCodes.Status400BadRequest);
                             })
                         .RequireIdempotency("payments");
                 },
@@ -83,6 +84,7 @@ public sealed class IdempotencyPolicyTests
                     options.AddPolicy(
                         "payments",
                         policy => { policy.StoreClientErrors = false; });
+                    options.UseInMemory();
                 });
 
         using var firstRequest =
@@ -129,6 +131,7 @@ public sealed class IdempotencyPolicyTests
                     options.AddPolicy(
                         "short-keys",
                         policy => { policy.MaxKeyLength = 5; });
+                    options.UseInMemory();
                 });
 
         using var request =
@@ -153,6 +156,7 @@ public sealed class IdempotencyPolicyTests
     {
         await using IdempotencyTestServer server =
             await IdempotencyTestServer.CreateAsync(
+                opts => opts.UseInMemory(),
                 configureEndpoints: endpoints =>
                 {
                     endpoints.MapPost(

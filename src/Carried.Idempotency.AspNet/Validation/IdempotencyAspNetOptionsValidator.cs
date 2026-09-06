@@ -5,7 +5,7 @@ using Microsoft.Extensions.Options;
 
 namespace Carried.Idempotency.AspNet.Validation;
 
-public sealed class IdempotencyAspNetOptionsValidator
+internal sealed class IdempotencyAspNetOptionsValidator
     : IValidateOptions<IdempotencyAspNetOptions>
 {
     private readonly IEnumerable<IIdempotencyFingerprintContributor>
@@ -14,6 +14,8 @@ public sealed class IdempotencyAspNetOptionsValidator
     public IdempotencyAspNetOptionsValidator(
         IEnumerable<IIdempotencyFingerprintContributor> contributors)
     {
+        ArgumentNullException.ThrowIfNull(contributors);
+
         _contributors = contributors;
     }
 
@@ -21,18 +23,17 @@ public sealed class IdempotencyAspNetOptionsValidator
         string? name,
         IdempotencyAspNetOptions options)
     {
+        ArgumentNullException.ThrowIfNull(options);
+
         var failures = new List<string>();
 
         if (string.IsNullOrWhiteSpace(options.HeaderName))
         {
-            failures.Add(
-                "HeaderName is required.");
+            failures.Add("HeaderName is required.");
         }
-        else if (!HttpHeaderNameValidator.IsValid(
-                     options.HeaderName))
+        else if (!HttpHeaderNameValidator.IsValid(options.HeaderName))
         {
-            failures.Add(
-                $"HeaderName '{options.HeaderName}' is not a valid HTTP header name.");
+            failures.Add($"HeaderName '{options.HeaderName}' is not a valid HTTP header name.");
         }
 
         failures.AddRange(
@@ -43,29 +44,13 @@ public sealed class IdempotencyAspNetOptionsValidator
         foreach (KeyValuePair<string, IdempotencyPolicy> policy
                  in options.Policies)
         {
-            if (string.IsNullOrWhiteSpace(policy.Key))
-            {
-                failures.Add(
-                    "Named policy names cannot be empty or whitespace.");
-
-                continue;
-            }
-
             failures.AddRange(
                 IdempotencyPolicyValidator.Validate(
                     policy.Value,
                     $"Policies['{policy.Key}']"));
         }
 
-        string? contributorError =
-            FingerprintContributorValidator.Validate(
-                _contributors);
-
-        if (contributorError is not null)
-        {
-            failures.Add(
-                contributorError);
-        }
+        failures.AddRange(FingerprintContributorValidator.Validate(_contributors));
 
         return failures.Count == 0
             ? ValidateOptionsResult.Success

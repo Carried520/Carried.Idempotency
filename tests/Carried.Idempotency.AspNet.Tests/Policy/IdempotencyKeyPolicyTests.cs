@@ -18,16 +18,19 @@ public sealed class IdempotencyKeyPolicyTests
             await IdempotencyTestServer.CreateAsync(
                 configureEndpoints: endpoints =>
                 {
-                    endpoints.MapPost("/test", () =>
-                    {
-                        executionCount++;
+                    endpoints.MapPost(
+                            "/test",
+                            () =>
+                            {
+                                executionCount++;
 
-                        return Results.Ok();
-                    })
-                    .RequireIdempotency();
+                                return Results.Ok();
+                            })
+                        .RequireIdempotency();
                 },
                 configureAspNetOptions: options =>
                 {
+                    options.UseInMemory();
                     options.HeaderName = "X-Idempotency-Key";
                 });
 
@@ -80,6 +83,7 @@ public sealed class IdempotencyKeyPolicyTests
                 },
                 configureAspNetOptions: options =>
                 {
+                    options.UseInMemory();
                     options.HeaderName = "X-Idempotency-Key";
                 });
 
@@ -117,7 +121,8 @@ public sealed class IdempotencyKeyPolicyTests
                 },
                 configureAspNetOptions: options =>
                 {
-                    options.DefaultPolicy.MaxKeyLength =  maxKeyLength;
+                    options.DefaultPolicy.MaxKeyLength = maxKeyLength;
+                    options.UseInMemory();
                 });
 
         using var request =
@@ -155,6 +160,7 @@ public sealed class IdempotencyKeyPolicyTests
                 configureAspNetOptions: options =>
                 {
                     options.DefaultPolicy.MaxKeyLength = maxKeyLength;
+                    options.UseInMemory();
                 });
 
         using var request =
@@ -177,30 +183,30 @@ public sealed class IdempotencyKeyPolicyTests
     [Fact]
     public async Task EmptyHeaderName_FailsStartup()
     {
-        await Assert.ThrowsAsync<OptionsValidationException>(
-            async () =>
-            {
-                await using var server =
-                    await IdempotencyTestServer.CreateAsync(
-                        configureAspNetOptions: options =>
-                        {
-                            options.HeaderName = "";
-                        });
-            });
+        await Assert.ThrowsAsync<OptionsValidationException>(async () =>
+        {
+            await using var server =
+                await IdempotencyTestServer.CreateAsync(
+                    configureAspNetOptions: options =>
+                    {
+                        options.HeaderName = "";
+                        options.UseInMemory();
+                    });
+        });
     }
 
     [Fact]
     public async Task NonPositiveMaxKeyLength_FailsStartup()
     {
-        await Assert.ThrowsAsync<OptionsValidationException>(
-            async () =>
-            {
-                await using var server =
-                    await IdempotencyTestServer.CreateAsync(
-                        configureAspNetOptions: options =>
-                        {
-                            options.DefaultPolicy.MaxKeyLength = 0;
-                        });
-            });
+        await Assert.ThrowsAsync<OptionsValidationException>(async () =>
+        {
+            await using var server =
+                await IdempotencyTestServer.CreateAsync(
+                    configureAspNetOptions: options =>
+                    {
+                        options.DefaultPolicy.MaxKeyLength = 0;
+                        options.UseInMemory();
+                    });
+        });
     }
 }

@@ -1,4 +1,5 @@
 using System.Net;
+using Carried.Idempotency.AspNet.Builders;
 using Carried.Idempotency.AspNet.Extensions;
 using Carried.Idempotency.AspNet.Options;
 using Carried.Idempotency.AspNet.Tests.TestServer;
@@ -15,17 +16,20 @@ public sealed class IdempotencyResponseEligibilityTests
     {
         var executionCount = 0;
 
-        await using WebApplication app = await CreateAppAsync(app =>
-        {
-            app.MapPost("/test", () =>
-                {
-                    executionCount++;
+        await using WebApplication app = await CreateAppAsync(
+            app =>
+            {
+                app.MapPost(
+                        "/test",
+                        () =>
+                        {
+                            executionCount++;
 
-                    return Results.StatusCode(
-                        StatusCodes.Status500InternalServerError);
-                })
-                .RequireIdempotency();
-        });
+                            return Results.StatusCode(StatusCodes.Status500InternalServerError);
+                        })
+                    .RequireIdempotency();
+            },
+            opts => opts.UseInMemory());
 
         HttpClient client = app.GetTestClient();
 
@@ -51,17 +55,20 @@ public sealed class IdempotencyResponseEligibilityTests
     {
         var executionCount = 0;
 
-        await using WebApplication app = await CreateAppAsync(app =>
-        {
-            app.MapPost("/test", () =>
-                {
-                    executionCount++;
+        await using WebApplication app = await CreateAppAsync(
+            app =>
+            {
+                app.MapPost(
+                        "/test",
+                        () =>
+                        {
+                            executionCount++;
 
-                    return Results.StatusCode(
-                        StatusCodes.Status429TooManyRequests);
-                })
-                .RequireIdempotency();
-        });
+                            return Results.StatusCode(StatusCodes.Status429TooManyRequests);
+                        })
+                    .RequireIdempotency();
+            },
+            opts => opts.UseInMemory());
 
         HttpClient client = app.GetTestClient();
 
@@ -87,17 +94,20 @@ public sealed class IdempotencyResponseEligibilityTests
     {
         var executionCount = 0;
 
-        await using WebApplication app = await CreateAppAsync(app =>
-        {
-            app.MapPost("/test", () =>
-                {
-                    executionCount++;
+        await using WebApplication app = await CreateAppAsync(
+            app =>
+            {
+                app.MapPost(
+                        "/test",
+                        () =>
+                        {
+                            executionCount++;
 
-                    return Results.StatusCode(
-                        StatusCodes.Status408RequestTimeout);
-                })
-                .RequireIdempotency();
-        });
+                            return Results.StatusCode(StatusCodes.Status408RequestTimeout);
+                        })
+                    .RequireIdempotency();
+            },
+            opts => opts.UseInMemory());
 
         HttpClient client = app.GetTestClient();
 
@@ -123,16 +133,20 @@ public sealed class IdempotencyResponseEligibilityTests
     {
         var executionCount = 0;
 
-        await using WebApplication app = await CreateAppAsync(app =>
-        {
-            app.MapPost("/test", () =>
-                {
-                    executionCount++;
+        await using WebApplication app = await CreateAppAsync(
+            app =>
+            {
+                app.MapPost(
+                        "/test",
+                        () =>
+                        {
+                            executionCount++;
 
-                    return Results.BadRequest();
-                })
-                .RequireIdempotency();
-        });
+                            return Results.BadRequest();
+                        })
+                    .RequireIdempotency();
+            },
+            opts => opts.UseInMemory());
 
         HttpClient client = app.GetTestClient();
 
@@ -161,15 +175,21 @@ public sealed class IdempotencyResponseEligibilityTests
         await using WebApplication app = await CreateAppAsync(
             app =>
             {
-                app.MapPost("/test", () =>
-                    {
-                        executionCount++;
+                app.MapPost(
+                        "/test",
+                        () =>
+                        {
+                            executionCount++;
 
-                        return Results.BadRequest();
-                    })
+                            return Results.BadRequest();
+                        })
                     .RequireIdempotency();
             },
-            options => { options.DefaultPolicy.StoreClientErrors = false; });
+            options =>
+            {
+                options.DefaultPolicy.StoreClientErrors = false;
+                options.UseInMemory();
+            });
 
         HttpClient client = app.GetTestClient();
 
@@ -201,16 +221,19 @@ public sealed class IdempotencyResponseEligibilityTests
             await IdempotencyTestServer.CreateAsync(
                 configureEndpoints: endpoints =>
                 {
-                    endpoints.MapPost("/test", () =>
-                        {
-                            executionCount++;
+                    endpoints.MapPost(
+                            "/test",
+                            () =>
+                            {
+                                executionCount++;
 
-                            return Results.Text(responseBody);
-                        })
+                                return Results.Text(responseBody);
+                            })
                         .RequireIdempotency();
                 },
                 configureAspNetOptions: options =>
                 {
+                    options.UseInMemory();
                     options.DefaultPolicy.MaxRetainedResponseBodySize =
                         responseBody.Length;
                 });
@@ -255,15 +278,21 @@ public sealed class IdempotencyResponseEligibilityTests
             await IdempotencyTestServer.CreateAsync(
                 configureEndpoints: endpoints =>
                 {
-                    endpoints.MapPost("/test", () =>
-                        {
-                            executionCount++;
+                    endpoints.MapPost(
+                            "/test",
+                            () =>
+                            {
+                                executionCount++;
 
-                            return Results.Text(responseBody);
-                        })
+                                return Results.Text(responseBody);
+                            })
                         .RequireIdempotency();
                 },
-                configureAspNetOptions: options => { options.DefaultPolicy.MaxRetainedResponseBodySize = 8; });
+                configureAspNetOptions: options =>
+                {
+                    options.DefaultPolicy.MaxRetainedResponseBodySize = 8;
+                    options.UseInMemory();
+                });
 
         using var firstRequest =
             new HttpRequestMessage(
@@ -296,15 +325,14 @@ public sealed class IdempotencyResponseEligibilityTests
 
     private static async Task<WebApplication> CreateAppAsync(
         Action<WebApplication> configure,
-        Action<IdempotencyAspNetOptions>? configureAspNetOptions = null)
+        Action<IdempotencyBuilder> configureAspNetOptions)
     {
         WebApplicationBuilder builder =
             WebApplication.CreateBuilder();
 
         builder.WebHost.UseTestServer();
 
-        builder.Services.AddIdempotency(
-            configureAspNetOptions: configureAspNetOptions);
+        builder.Services.AddIdempotency(configureAspNetOptions);
 
         WebApplication app = builder.Build();
 
