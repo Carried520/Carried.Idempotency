@@ -5,35 +5,56 @@ using Microsoft.Extensions.Options;
 
 namespace Carried.Idempotency.AspNet.Validation;
 
-public class IdempotencyAspNetOptionsValidator : IValidateOptions<IdempotencyAspNetOptions>
+public sealed class IdempotencyAspNetOptionsValidator
+    : IValidateOptions<IdempotencyAspNetOptions>
 {
-    private readonly IEnumerable<IIdempotencyFingerprintContributor> _contributors;
+    private readonly IEnumerable<IIdempotencyFingerprintContributor>
+        _contributors;
 
-    public IdempotencyAspNetOptionsValidator(IEnumerable<IIdempotencyFingerprintContributor> contributors)
+    public IdempotencyAspNetOptionsValidator(
+        IEnumerable<IIdempotencyFingerprintContributor> contributors)
     {
         _contributors = contributors;
     }
 
-    public ValidateOptionsResult Validate(string? name, IdempotencyAspNetOptions options)
+    public ValidateOptionsResult Validate(
+        string? name,
+        IdempotencyAspNetOptions options)
     {
+        var failures = new List<string>();
+
         if (string.IsNullOrWhiteSpace(options.HeaderName))
         {
-            return ValidateOptionsResult.Fail(
+            failures.Add(
                 "HeaderName is required.");
         }
-
-        if (!IdempotencyPolicyValidator.IsValid(
-                options.DefaultPolicy))
+        else if (!HttpHeaderNameValidator.IsValid(
+                     options.HeaderName))
         {
-            return ValidateOptionsResult.Fail(
-                "Default idempotency policy is invalid.");
+            failures.Add(
+                $"HeaderName '{options.HeaderName}' is not a valid HTTP header name.");
         }
 
-        if (!options.Policies.Values.All(
-                IdempotencyPolicyValidator.IsValid))
+        failures.AddRange(
+            IdempotencyPolicyValidator.Validate(
+                options.DefaultPolicy,
+                "DefaultPolicy"));
+
+        foreach (KeyValuePair<string, IdempotencyPolicy> policy
+                 in options.Policies)
         {
-            return ValidateOptionsResult.Fail(
-                "One or more named idempotency policies are invalid.");
+            if (string.IsNullOrWhiteSpace(policy.Key))
+            {
+                failures.Add(
+                    "Named policy names cannot be empty or whitespace.");
+
+                continue;
+            }
+
+            failures.AddRange(
+                IdempotencyPolicyValidator.Validate(
+                    policy.Value,
+                    $"Policies['{policy.Key}']"));
         }
 
         string? contributorError =
@@ -42,10 +63,12 @@ public class IdempotencyAspNetOptionsValidator : IValidateOptions<IdempotencyAsp
 
         if (contributorError is not null)
         {
-            return ValidateOptionsResult.Fail(
+            failures.Add(
                 contributorError);
         }
 
-        return ValidateOptionsResult.Success;
+        return failures.Count == 0
+            ? ValidateOptionsResult.Success
+            : ValidateOptionsResult.Fail(failures);
     }
 }
