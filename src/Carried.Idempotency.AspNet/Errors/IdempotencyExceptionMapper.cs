@@ -27,6 +27,10 @@ internal static class IdempotencyExceptionMapper
                 StatusCodes.Status500InternalServerError,
                 "idempotency_unsupported_response",
                 exception.Message),
+            IdempotencyPolicyNotFoundException => new IdempotencyError(
+                StatusCodes.Status500InternalServerError,
+                "idempotency_policy_not_found",
+                exception.Message),
             _ => throw new ArgumentOutOfRangeException(
                 nameof(exception),
                 exception,
