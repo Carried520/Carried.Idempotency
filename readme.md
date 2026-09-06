@@ -44,17 +44,17 @@ Execute an operation using an idempotency key and operation fingerprint:
 
 ```csharp
 var key = new IdempotencyKey(
-    scope: "TODO",
-    value: "TODO");
+    scope: "orders-create",
+    value: "request-123");
 
 var result = await idempotency.ExecuteAsync(
     key,
-    fingerprint: "TODO",
+    fingerprint: "my-fingerprint-here",
     async cancellationToken =>
     {
         // Perform operation.
 
-        return IdempotencyOperationResult<TODO>.Complete(TODO);
+        return IdempotencyOperationResult<string>.Complete("result");
     },
     cancellationToken);
 ```
@@ -89,13 +89,13 @@ A subsequent execution can acquire the key and execute the operation again.
 
 ## 🔑 Idempotency Behavior
 
-| Situation | Behavior |
-|---|---|
-| New idempotency key | Ownership is acquired and the operation executes |
-| Same key and operation while active | Operation is already in progress |
-| Same key and completed operation | Previously retained result is replayed |
-| Same key for a different operation | Conflict |
-| Expired entry | The key can be acquired again |
+| Situation                           | Behavior                                         |
+|-------------------------------------|--------------------------------------------------|
+| New idempotency key                 | Ownership is acquired and the operation executes |
+| Same key and operation while active | Operation is already in progress                 |
+| Same key and completed operation    | Previously retained result is replayed           |
+| Same key for a different operation  | Conflict                                         |
+| Expired entry                       | The key can be acquired again                    |
 
 ### Exceptions
 
@@ -153,8 +153,7 @@ builder.Services.AddIdempotency(options =>
     options.CompletedRetention = TimeSpan.FromHours(24);
 
     options.UseInMemory();
-
-    // Configure ASP.NET Core behavior here.
+    options.HeaderName = "Idempotency-Key";
 });
 ```
 
@@ -171,7 +170,7 @@ app.UseIdempotency();
 Enable idempotency for an endpoint:
 
 ```csharp
-app.MapPost("/TODO", async () =>
+app.MapPost("/orders/add", async () =>
 {
     // ...
 })
@@ -185,7 +184,7 @@ Idempotency can also be enabled using the `RequireIdempotency` attribute:
 ```csharp
 [RequireIdempotency]
 [HttpPost]
-public async Task<IActionResult> TODO()
+public async Task<IActionResult> AddOrder()
 {
     // ...
 }
@@ -207,7 +206,7 @@ The header name can be configured:
 ```csharp
 builder.Services.AddIdempotency(options =>
 {
-    options.HeaderName = "TODO";
+    options.HeaderName = "X-Idempotency-Key";
     options.UseInMemory();
 });
 ```
@@ -232,12 +231,6 @@ Custom fingerprint inputs can be added by implementing:
 
 ```csharp
 IIdempotencyFingerprintContributor
-```
-
-Example:
-
-```csharp
-// TODO: contributor example
 ```
 
 ## 📜 Response Replay
@@ -269,8 +262,7 @@ builder.Services.AddIdempotency(options =>
 {
     options.UseInMemory();
 
-    options.DefaultPolicy.MaxKeyLength = TODO;
-    // Additional policy configuration...
+    options.DefaultPolicy.MaxKeyLength = 255;
 });
 ```
 
@@ -283,7 +275,7 @@ builder.Services.AddIdempotency(options =>
 
     options.AddPolicy("strict", policy =>
     {
-        // Configure policy...
+        policy.MaxKeyLength = 255;
     });
 });
 ```
@@ -291,14 +283,39 @@ builder.Services.AddIdempotency(options =>
 A named policy can then be applied to an endpoint:
 
 ```csharp
-// TODO: named policy endpoint example
+app.MapPost("/orders/add", async () =>
+{
+    // ...
+})
+.RequireIdempotency("strict");
 ```
 
-## 🗄️ Custom Storage
+or on controller:
 
-The Core engine is storage-agnostic.
+```csharp
+[RequireIdempotency("strict")]
+[HttpPost]
+public async Task<IActionResult> AddOrder()
+{
+    // ...
+}
+```
 
-Custom providers implement:
+## Storage Providers
+
+The Core package includes an in-memory store, with built-in ASP.NET Core registration
+available through `UseInMemory()`. Additional storage providers are planned.
+
+| Provider              | Package                      | Status      |
+|-----------------------|------------------------------|-------------|
+| In-memory             | `Carried.Idempotency`        | ✅ Available |
+| Redis                 | `Carried.Idempotency.Redis`  | 🛠️ Planned |
+| Entity Framework Core | `Carried.Idempotency.EFCore` | 🛠️ Planned |
+
+## 🔌 Custom Stores
+
+The Core engine is storage-agnostic. Custom stores can be used directly with the
+Core engine by implementing:
 
 ```csharp
 IIdempotencyStore
@@ -319,17 +336,8 @@ Custom stores must preserve the ownership and lease semantics defined by
 ```csharp
 public sealed class MyIdempotencyStore : IIdempotencyStore
 {
-    // Implementation...
+    // implement IIdempotencyStore methods here
 }
-```
-
-### ASP.NET Core Provider Registration
-
-```csharp
-builder.Services.AddIdempotency(options =>
-{
-    // TODO: custom provider registration
-});
 ```
 
 ## 🔄 Custom Serialization
@@ -367,7 +375,8 @@ The Core engine exposes lifecycle events for observing idempotency behavior:
 ASP.NET Core integration can additionally provide logging and metrics.
 
 ```csharp
-// TODO: logging / metrics configuration
+builder.Services.AddIdempotencyLogging();
+builder.Services.AddIdempotencyMetrics();
 ```
 
 ## 🧪 Example
@@ -384,7 +393,7 @@ It demonstrates the package using actual HTTP requests and idempotency behavior.
 
 This project is licensed under the MIT License.
 
-See [LICENSE](LICENSE) for details.
+See [LICENSE](license.md) for details.
 
 ## 📦 Semantic Versioning (SemVer)
 
