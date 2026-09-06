@@ -12,6 +12,10 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Carried.Idempotency.AspNet"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Carried.Idempotency.AspNet.Tests", "tests\Carried.Idempotency.AspNet.Tests\Carried.Idempotency.AspNet.Tests.csproj", "{4B8B58F7-2382-4A2D-B3A3-B8F29907943C}"
 EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "examples", "examples", "{F54961EB-725C-4307-BCB9-339E72A6FBF0}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Carried.Idempotency.ExampleApi", "examples\Carried.Idempotency.ExampleApi\Carried.Idempotency.ExampleApi.csproj", "{82A71A14-460C-4D1F-872F-76F4431B5BAE}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -34,11 +38,16 @@ Global
 		{4B8B58F7-2382-4A2D-B3A3-B8F29907943C}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{4B8B58F7-2382-4A2D-B3A3-B8F29907943C}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{4B8B58F7-2382-4A2D-B3A3-B8F29907943C}.Release|Any CPU.Build.0 = Release|Any CPU
+		{82A71A14-460C-4D1F-872F-76F4431B5BAE}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{82A71A14-460C-4D1F-872F-76F4431B5BAE}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{82A71A14-460C-4D1F-872F-76F4431B5BAE}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{82A71A14-460C-4D1F-872F-76F4431B5BAE}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(NestedProjects) = preSolution
 		{8E8A2892-9176-4EB1-B3E4-3E2863478BE9} = {6C54E45C-9729-4D5C-8F50-3E9FCB7A6FDB}
 		{E59BAB74-42BC-4195-A8A5-C7A49ABCC956} = {4616ACCC-DFB2-43F8-AFBD-143FBBC450D3}
 		{BDFF2026-0764-4214-AB5C-837935DCA79C} = {6C54E45C-9729-4D5C-8F50-3E9FCB7A6FDB}
 		{4B8B58F7-2382-4A2D-B3A3-B8F29907943C} = {4616ACCC-DFB2-43F8-AFBD-143FBBC450D3}
+		{82A71A14-460C-4D1F-872F-76F4431B5BAE} = {F54961EB-725C-4307-BCB9-339E72A6FBF0}
 	EndGlobalSection
 EndGlobal
