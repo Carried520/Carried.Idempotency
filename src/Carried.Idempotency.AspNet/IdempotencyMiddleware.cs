@@ -120,10 +120,20 @@ internal sealed class IdempotencyMiddleware
             return;
         }
 
-        IdempotencyPolicy policy =
-            metadata.PolicyName is null
+        IdempotencyPolicy policy;
+
+        try
+        {
+            policy = metadata.PolicyName is null
                 ? _options.DefaultPolicy
                 : ResolvePolicy(metadata.PolicyName);
+        }
+        catch (IdempotencyPolicyNotFoundException exception)
+        {
+            IdempotencyError error = IdempotencyExceptionMapper.Map(exception);
+            await idempotencyErrorResponseWriter.WriteAsync(context, error, context.RequestAborted);
+            return;
+        }
 
         if (!context.Request.Headers.TryGetValue(
                 _options.HeaderName,
@@ -224,6 +234,6 @@ internal sealed class IdempotencyMiddleware
             return policy;
         }
 
-        throw new InvalidOperationException($"Idempotency policy '{policyName}' is not configured.");
+        throw new IdempotencyPolicyNotFoundException(policyName);
     }
 }
