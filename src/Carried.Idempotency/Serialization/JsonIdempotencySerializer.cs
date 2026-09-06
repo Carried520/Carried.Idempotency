@@ -4,15 +4,12 @@ namespace Carried.Idempotency.Serialization;
 
 internal sealed class JsonIdempotencySerializer : IIdempotencySerializer
 {
-    public byte[] Serialize<T>(T? value)
-    {
-        byte[] payload = JsonSerializer.SerializeToUtf8Bytes(value);
-        return payload;
-    }
+    public byte[] Serialize<T>(T? value) => JsonSerializer.SerializeToUtf8Bytes(value);
 
     public T? Deserialize<T>(byte[] payload)
     {
-        var value = JsonSerializer.Deserialize<T>(payload);
-        return value;
+        ArgumentNullException.ThrowIfNull(payload);
+
+        return JsonSerializer.Deserialize<T>(payload);
     }
 }

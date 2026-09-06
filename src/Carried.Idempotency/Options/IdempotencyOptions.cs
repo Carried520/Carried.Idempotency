@@ -7,7 +7,7 @@ public sealed class IdempotencyOptions
 {
     /// <summary>
     /// Gets or sets how long an acquired idempotency key remains owned
-    /// without a successful lease renewal
+    /// without a successful lease renewal.
     /// </summary>
     public TimeSpan LeaseDuration { get; set; } = TimeSpan.FromMinutes(5);
     
@@ -21,7 +21,7 @@ public sealed class IdempotencyOptions
         if (LeaseDuration.Ticks < 3)
             throw new ArgumentOutOfRangeException(
                 nameof(LeaseDuration),
-                "Lease duration must be positive and large enough for lease renewal.");
+                "Lease duration must be at least three ticks.");
 
         if (CompletedRetention <= TimeSpan.Zero)
             throw new ArgumentOutOfRangeException(

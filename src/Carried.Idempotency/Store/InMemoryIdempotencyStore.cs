@@ -11,12 +11,20 @@ internal sealed class InMemoryIdempotencyStore : IIdempotencyStore
 
     public InMemoryIdempotencyStore(IdempotencyOptions idempotencyOptions, TimeProvider timeProvider)
     {
+        ArgumentNullException.ThrowIfNull(idempotencyOptions);
+        ArgumentNullException.ThrowIfNull(timeProvider);
+
         _idempotencyOptions = idempotencyOptions;
         _timeProvider = timeProvider;
     }
 
-    public ValueTask<IdempotencyAcquireResult> TryAcquireAsync(IdempotencyKey key, string fingerprint, CancellationToken cancellationToken = default)
+    public ValueTask<IdempotencyAcquireResult> TryAcquireAsync(IdempotencyKey key,
+        string fingerprint,
+        CancellationToken cancellationToken = default)
     {
+        ArgumentNullException.ThrowIfNull(key);
+        ArgumentException.ThrowIfNullOrWhiteSpace(fingerprint);
+
         cancellationToken.ThrowIfCancellationRequested();
         while (true)
         {
@@ -34,8 +42,7 @@ internal sealed class InMemoryIdempotencyStore : IIdempotencyStore
 
             if (_entries.TryAdd(key, candidateEntry))
             {
-                return ValueTask.FromResult(
-                    IdempotencyAcquireResult.Acquired(ownerToken));
+                return ValueTask.FromResult(IdempotencyAcquireResult.Acquired(ownerToken));
             }
 
             if (!_entries.TryGetValue(key, out IdempotencyEntry? existingEntry))
@@ -49,7 +56,8 @@ internal sealed class InMemoryIdempotencyStore : IIdempotencyStore
                     if (existingEntry.Fingerprint != fingerprint)
                         return ValueTask.FromResult(IdempotencyAcquireResult.Conflict());
                     if (existingEntry.LeaseExpiresAt is null)
-                        throw new InvalidOperationException("LeaseExpiresAt is null");
+                        throw new InvalidOperationException(
+                            "An in-progress idempotency entry has no lease expiration.");
 
                     if (now < existingEntry.LeaseExpiresAt)
                         return ValueTask.FromResult(IdempotencyAcquireResult.InProgress());
@@ -61,10 +69,10 @@ internal sealed class InMemoryIdempotencyStore : IIdempotencyStore
 
                 case IdempotencyState.Completed:
                     if (existingEntry.CompletedExpiresAt is null)
-                        throw new InvalidOperationException("CompletedExpiresAt is null");
+                        throw new InvalidOperationException("A completed idempotency entry has no expiration.");
 
                     if (existingEntry.Payload is null)
-                        throw new InvalidOperationException("Payload is null");
+                        throw new InvalidOperationException("A completed idempotency entry has no payload.");
 
                     if (now < existingEntry.CompletedExpiresAt)
                     {
@@ -80,22 +88,29 @@ internal sealed class InMemoryIdempotencyStore : IIdempotencyStore
                     return ValueTask.FromResult(IdempotencyAcquireResult.Acquired(ownerToken));
 
                 default:
-                    throw new InvalidOperationException();
+                    throw new InvalidOperationException($"Unknown idempotency state: {existingEntry.State}");
             }
         }
     }
 
-    public ValueTask<bool> TryCompleteAsync(IdempotencyKey key, Guid ownerToken, byte[] payload, CancellationToken cancellationToken = default)
+    public ValueTask<bool> TryCompleteAsync(IdempotencyKey key,
+        Guid ownerToken,
+        byte[] payload,
+        CancellationToken cancellationToken = default)
     {
+        ArgumentNullException.ThrowIfNull(key);
+        ArgumentNullException.ThrowIfNull(payload);
+
         cancellationToken.ThrowIfCancellationRequested();
-        if (!_entries.TryGetValue(key, out IdempotencyEntry? existingEntry) || existingEntry.State is not IdempotencyState.InProgress ||
+        if (!_entries.TryGetValue(key, out IdempotencyEntry? existingEntry) ||
+            existingEntry.State is not IdempotencyState.InProgress ||
             existingEntry.OwnerToken != ownerToken)
         {
             return ValueTask.FromResult(false);
         }
 
         if (existingEntry.LeaseExpiresAt is null)
-            throw new InvalidOperationException("LeaseExpiresAt is null");
+            throw new InvalidOperationException("An in-progress idempotency entry has no lease expiration.");
 
         DateTimeOffset now = _timeProvider.GetUtcNow();
         if (now >= existingEntry.LeaseExpiresAt)
@@ -115,7 +130,9 @@ internal sealed class InMemoryIdempotencyStore : IIdempotencyStore
     }
 
 
-    public ValueTask<bool> TryReleaseAsync(IdempotencyKey key, Guid ownerToken, CancellationToken cancellationToken = default)
+    public ValueTask<bool> TryReleaseAsync(IdempotencyKey key,
+        Guid ownerToken,
+        CancellationToken cancellationToken = default)
     {
         cancellationToken.ThrowIfCancellationRequested();
         if (!_entries.TryGetValue(key, out IdempotencyEntry? existingEntry) ||
@@ -131,14 +148,18 @@ internal sealed class InMemoryIdempotencyStore : IIdempotencyStore
         if (_timeProvider.GetUtcNow() >= existingEntry.LeaseExpiresAt)
             return ValueTask.FromResult(false);
 
-        return ValueTask.FromResult(_entries.TryRemove(new KeyValuePair<IdempotencyKey, IdempotencyEntry>(key, existingEntry)));
+        return ValueTask.FromResult(
+            _entries.TryRemove(new KeyValuePair<IdempotencyKey, IdempotencyEntry>(key, existingEntry)));
     }
 
-    public ValueTask<bool> TryRenewLeaseAsync(IdempotencyKey key, Guid ownerToken, CancellationToken cancellationToken = default)
+    public ValueTask<bool> TryRenewLeaseAsync(IdempotencyKey key,
+        Guid ownerToken,
+        CancellationToken cancellationToken = default)
     {
         cancellationToken.ThrowIfCancellationRequested();
 
-        if (!_entries.TryGetValue(key, out IdempotencyEntry? existingEntry) || existingEntry.State is not IdempotencyState.InProgress ||
+        if (!_entries.TryGetValue(key, out IdempotencyEntry? existingEntry) ||
+            existingEntry.State is not IdempotencyState.InProgress ||
             ownerToken != existingEntry.OwnerToken)
             return ValueTask.FromResult(false);
 
@@ -152,7 +173,8 @@ internal sealed class InMemoryIdempotencyStore : IIdempotencyStore
 
         var renewedEntry = new IdempotencyEntry
         {
-            Fingerprint = existingEntry.Fingerprint, State = IdempotencyState.InProgress, OwnerToken = existingEntry.OwnerToken, Payload = null,
+            Fingerprint = existingEntry.Fingerprint, State = IdempotencyState.InProgress,
+            OwnerToken = existingEntry.OwnerToken, Payload = null,
             LeaseExpiresAt = now + _idempotencyOptions.LeaseDuration,
             CompletedExpiresAt = null
         };
