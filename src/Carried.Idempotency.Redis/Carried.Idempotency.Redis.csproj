@@ -1,0 +1,23 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+    <PropertyGroup>
+        <TargetFramework>net10.0</TargetFramework>
+        <ImplicitUsings>enable</ImplicitUsings>
+        <Nullable>enable</Nullable>
+    </PropertyGroup>
+
+    <ItemGroup>
+      <ProjectReference Include="..\Carried.Idempotency.DependencyInjection\Carried.Idempotency.DependencyInjection.csproj" />
+      <ProjectReference Include="..\Carried.Idempotency\Carried.Idempotency.csproj" />
+    </ItemGroup>
+
+    <ItemGroup>
+      <PackageReference Include="StackExchange.Redis" Version="3.1.31" />
+    </ItemGroup>
+
+    <ItemGroup>
+      <EmbeddedResource Include="Scripts\*.lua">
+      </EmbeddedResource>
+    </ItemGroup>
+
+</Project>

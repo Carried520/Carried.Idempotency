@@ -8,7 +8,7 @@ namespace Carried.Idempotency.AspNet.Extensions;
 /// </summary>
 public static class InMemoryIdempotencyBuilderExtensions
 {
-    extension(IdempotencyBuilder builder)
+    extension(IdempotencyAspNetBuilder aspNetBuilder)
     {
         /// <summary>
         /// Configures idempotency to use the in-memory provider.
@@ -19,11 +19,11 @@ public static class InMemoryIdempotencyBuilderExtensions
         /// </remarks>
         public void UseInMemory()
         {
-            ArgumentNullException.ThrowIfNull(builder);
+            ArgumentNullException.ThrowIfNull(aspNetBuilder);
 
-            IdempotencyOptions options = builder.CoreOptions;
+            IdempotencyOptions options = aspNetBuilder.CoreOptions;
 
-            builder.ConfigureProvider(_ => IdempotencyService.CreateInMemory(options));
+            aspNetBuilder.ConfigureProvider(_ => IdempotencyService.CreateInMemory(options));
         }
     }
 }
