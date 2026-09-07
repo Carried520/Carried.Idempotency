@@ -36,6 +36,7 @@
     </ItemGroup>
 
     <ItemGroup>
+        <ProjectReference Include="..\Carried.Idempotency.DependencyInjection\Carried.Idempotency.DependencyInjection.csproj" />
         <ProjectReference Include="..\Carried.Idempotency\Carried.Idempotency.csproj"/>
     </ItemGroup>
 
