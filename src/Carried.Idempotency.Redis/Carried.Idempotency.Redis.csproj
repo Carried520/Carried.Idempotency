@@ -2,22 +2,45 @@
 
     <PropertyGroup>
         <TargetFramework>net10.0</TargetFramework>
+
+        <PackageId>Carried.Idempotency.Redis</PackageId>
+        <Authors>Carried</Authors>
+        <Description>
+            Redis provider for Carried.Idempotency using atomic Lua scripts for distributed coordination.
+        </Description>
+
+        <PackageTags>idempotency;redis;dotnet;distributed-systems</PackageTags>
+
+        <PackageProjectUrl>https://github.com/Carried520/Carried.Idempotency</PackageProjectUrl>
+        <RepositoryUrl>https://github.com/Carried520/Carried.Idempotency</RepositoryUrl>
+        <RepositoryType>git</RepositoryType>
+
+        <PackageLicenseExpression>MIT</PackageLicenseExpression>
+        <PackageReadmeFile>README.md</PackageReadmeFile>
+
+        <GenerateDocumentationFile>true</GenerateDocumentationFile>
+
         <ImplicitUsings>enable</ImplicitUsings>
         <Nullable>enable</Nullable>
     </PropertyGroup>
 
     <ItemGroup>
-      <ProjectReference Include="..\Carried.Idempotency.DependencyInjection\Carried.Idempotency.DependencyInjection.csproj" />
-      <ProjectReference Include="..\Carried.Idempotency\Carried.Idempotency.csproj" />
+        <None Include="..\..\README.md"
+              Pack="true"
+              PackagePath="\" />
     </ItemGroup>
 
     <ItemGroup>
-      <PackageReference Include="StackExchange.Redis" Version="3.1.31" />
+        <ProjectReference Include="..\Carried.Idempotency.DependencyInjection\Carried.Idempotency.DependencyInjection.csproj" />
+        <ProjectReference Include="..\Carried.Idempotency\Carried.Idempotency.csproj" />
     </ItemGroup>
 
     <ItemGroup>
-      <EmbeddedResource Include="Scripts\*.lua">
-      </EmbeddedResource>
+        <PackageReference Include="StackExchange.Redis" Version="3.1.31" />
+    </ItemGroup>
+
+    <ItemGroup>
+        <EmbeddedResource Include="Scripts\*.lua" />
     </ItemGroup>
 
 </Project>

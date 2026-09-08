@@ -2,6 +2,9 @@
 
 namespace Carried.Idempotency.DependencyInjection;
 
+/// <summary>
+/// Provides the base builder used to configure idempotency services and their storage provider.
+/// </summary>
 public abstract class IdempotencyBuilder
 {
     private Func<IServiceProvider, IdempotencyService>? _serviceFactory;
