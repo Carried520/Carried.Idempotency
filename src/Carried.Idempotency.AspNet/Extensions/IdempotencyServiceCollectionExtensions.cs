@@ -32,7 +32,7 @@ public static class IdempotencyServiceCollectionExtensions
         /// Thrown when no idempotency provider is configured or more than one provider is configured.
         /// </exception>
         public IServiceCollection AddIdempotency(
-            Action<IdempotencyBuilder> configure)
+            Action<IdempotencyAspNetBuilder> configure)
         {
             ArgumentNullException.ThrowIfNull(services);
             ArgumentNullException.ThrowIfNull(configure);
@@ -40,8 +40,7 @@ public static class IdempotencyServiceCollectionExtensions
             var coreOptions = new IdempotencyOptions();
             var aspNetOptions = new IdempotencyAspNetOptions();
 
-            var builder = new IdempotencyBuilder(
-                services,
+            var builder = new IdempotencyAspNetBuilder(
                 coreOptions,
                 aspNetOptions);
 
