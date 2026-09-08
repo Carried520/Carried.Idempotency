@@ -7,6 +7,17 @@ on:
 env:
   RELEASE_VERSION: ${{ github.event.release.tag_name }}
 
+  release:
+    types:
+      - published
+
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Package version"
+        required: true
+        type: string
+
 permissions:
   contents: read
   id-token: write
