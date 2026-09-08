@@ -13,7 +13,6 @@ on:
 
 env:
   RELEASE_VERSION: ${{ github.event.release.tag_name || inputs.version }}
-  CARRIED_TEST_POSTGRES: "Host=localhost;Port=5432;Database=carried_idempotency_tests;Username=postgres;Password=root"
 
 permissions:
   contents: read
@@ -69,7 +68,22 @@ jobs:
       - name: Build
         run: dotnet build --configuration Release --no-restore
 
+      - name: Verify PostgreSQL
+        env:
+          PGPASSWORD: postgres
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y postgresql-client
+          psql \
+            -h localhost \
+            -p 5432 \
+            -U postgres \
+            -d carried_idempotency_tests \
+            -c "SELECT 1;"
+
       - name: Test
+        env:
+          CARRIED_TEST_POSTGRES: "Host=localhost;Port=5432;Database=carried_idempotency_tests;Username=postgres;Password=postgres"
         run: dotnet test --configuration Release --no-build
 
       - name: Pack Core
