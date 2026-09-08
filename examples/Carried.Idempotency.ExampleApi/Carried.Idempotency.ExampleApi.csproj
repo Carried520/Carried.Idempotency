@@ -13,6 +13,7 @@
 
     <ItemGroup>
       <ProjectReference Include="..\..\src\Carried.Idempotency.AspNet\Carried.Idempotency.AspNet.csproj" />
+      <ProjectReference Include="..\..\src\Carried.Idempotency.Redis\Carried.Idempotency.Redis.csproj" />
     </ItemGroup>
 
 </Project>
