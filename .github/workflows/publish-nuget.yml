@@ -4,8 +4,15 @@ on:
   release:
     types: [released]
 
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Package version, e.g. v1.1.0"
+        required: true
+        type: string
+
 env:
-  RELEASE_VERSION: ${{ github.event.release.tag_name }}
+  RELEASE_VERSION: ${{ github.event.release.tag_name || inputs.version }}
 
 permissions:
   contents: read
