@@ -1,9 +1,11 @@
 name: Publish NuGet Packages
 
 on:
-  push:
-    tags:
-      - "v*.*.*"
+  release:
+    types: [released]
+
+env:
+  RELEASE_VERSION: ${{ github.event.release.tag_name }}
 
 permissions:
   contents: read
@@ -37,7 +39,7 @@ jobs:
       - name: Get package version
         id: version
         shell: bash
-        run: echo "version=${GITHUB_REF_NAME#v}" >> "$GITHUB_OUTPUT"
+        run: echo "version=${RELEASE_VERSION#v}" >> "$GITHUB_OUTPUT"
 
       - name: Restore
         run: dotnet restore

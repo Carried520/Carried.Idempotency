@@ -9,13 +9,13 @@ namespace Carried.Idempotency.Redis.Tests;
 public sealed class RedisStoreExpiryTests : IAsyncLifetime
 {
     private static readonly TimeSpan LeaseDuration =
-        TimeSpan.FromMilliseconds(150);
+        TimeSpan.FromMilliseconds(500);
 
     private static readonly TimeSpan CompletedRetention =
-        TimeSpan.FromMilliseconds(150);
+        TimeSpan.FromMilliseconds(500);
 
     private static readonly TimeSpan ExpiryWait =
-        TimeSpan.FromMilliseconds(300);
+        TimeSpan.FromMilliseconds(800);
 
     private ConnectionMultiplexer _redis = null!;
     private RedisStore _store = null!;

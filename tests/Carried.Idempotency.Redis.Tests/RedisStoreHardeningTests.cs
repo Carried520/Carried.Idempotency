@@ -106,13 +106,12 @@ public sealed class RedisStoreHardeningTests : IAsyncLifetime
 
         await cancellationTokenSource.CancelAsync();
 
-        await Assert.ThrowsAsync<OperationCanceledException>(
-            () => store
-                .TryAcquireAsync(
-                    key,
-                    "fingerprint",
-                    cancellationTokenSource.Token)
-                .AsTask());
+        await Assert.ThrowsAsync<OperationCanceledException>(() => store
+            .TryAcquireAsync(
+                key,
+                "fingerprint",
+                cancellationTokenSource.Token)
+            .AsTask());
 
         IdempotencyAcquireResult result =
             await store.TryAcquireAsync(key, "fingerprint");
@@ -134,19 +133,19 @@ public sealed class RedisStoreHardeningTests : IAsyncLifetime
 
         await cancellationTokenSource.CancelAsync();
 
-        await Assert.ThrowsAsync<OperationCanceledException>(
-            () => store
-                .TryCompleteAsync(
-                    key,
-                    acquired.OwnerToken!.Value,
-                    [1, 2, 3],
-                    cancellationTokenSource.Token)
-                .AsTask());
+        await Assert.ThrowsAsync<OperationCanceledException>(() => store
+            .TryCompleteAsync(
+                key,
+                acquired.OwnerToken!.Value,
+                [1, 2, 3],
+                cancellationTokenSource.Token)
+            .AsTask());
 
-        bool completed = await store.TryCompleteAsync(
+        bool completed = acquired.OwnerToken != null && await store.TryCompleteAsync(
             key,
             acquired.OwnerToken.Value,
-            [4, 5, 6]);
+            [4, 5, 6],
+            cancellationTokenSource.Token);
 
         Assert.True(completed);
 
@@ -171,16 +170,15 @@ public sealed class RedisStoreHardeningTests : IAsyncLifetime
 
         await cancellationTokenSource.CancelAsync();
 
-        await Assert.ThrowsAsync<OperationCanceledException>(
-            () => store
-                .TryReleaseAsync(
-                    key,
-                    acquired.OwnerToken!.Value,
-                    cancellationTokenSource.Token)
-                .AsTask());
+        await Assert.ThrowsAsync<OperationCanceledException>(() => store
+            .TryReleaseAsync(
+                key,
+                acquired.OwnerToken!.Value,
+                cancellationTokenSource.Token)
+            .AsTask());
 
         IdempotencyAcquireResult result =
-            await store.TryAcquireAsync(key, "fingerprint");
+            await store.TryAcquireAsync(key, "fingerprint", cancellationTokenSource.Token);
 
         Assert.Equal(IdempotencyAcquireStatus.InProgress, result.Status);
     }
@@ -199,17 +197,17 @@ public sealed class RedisStoreHardeningTests : IAsyncLifetime
 
         await cancellationTokenSource.CancelAsync();
 
-        await Assert.ThrowsAsync<OperationCanceledException>(
-            () => store
-                .TryRenewLeaseAsync(
-                    key,
-                    acquired.OwnerToken!.Value,
-                    cancellationTokenSource.Token)
-                .AsTask());
+        await Assert.ThrowsAsync<OperationCanceledException>(() => store
+            .TryRenewLeaseAsync(
+                key,
+                acquired.OwnerToken!.Value,
+                cancellationTokenSource.Token)
+            .AsTask());
 
-        bool renewed = await store.TryRenewLeaseAsync(
+        bool renewed = acquired.OwnerToken != null && await store.TryRenewLeaseAsync(
             key,
-            acquired.OwnerToken.Value);
+            acquired.OwnerToken.Value,
+            cancellationTokenSource.Token);
 
         Assert.True(renewed);
     }
@@ -279,7 +277,7 @@ public sealed class RedisStoreHardeningTests : IAsyncLifetime
         RedisStore store = CreateStore();
         IdempotencyKey key = CreateKey();
 
-        byte[] payload = new byte[1024 * 1024];
+        var payload = new byte[1024 * 1024];
         Random.Shared.NextBytes(payload);
 
         IdempotencyAcquireResult acquired =
@@ -345,8 +343,7 @@ public sealed class RedisStoreHardeningTests : IAsyncLifetime
     {
         var options = new IdempotencyOptions
         {
-            LeaseDuration = TimeSpan.FromTicks(
-                TimeSpan.TicksPerMillisecond - 1)
+            LeaseDuration = TimeSpan.FromTicks(TimeSpan.TicksPerMillisecond - 1)
         };
 
         Assert.Throws<ArgumentOutOfRangeException>(() =>
@@ -360,8 +357,7 @@ public sealed class RedisStoreHardeningTests : IAsyncLifetime
     {
         var options = new IdempotencyOptions
         {
-            CompletedRetention = TimeSpan.FromTicks(
-                TimeSpan.TicksPerMillisecond - 1)
+            CompletedRetention = TimeSpan.FromTicks(TimeSpan.TicksPerMillisecond - 1)
         };
 
         Assert.Throws<ArgumentOutOfRangeException>(() =>
@@ -373,8 +369,7 @@ public sealed class RedisStoreHardeningTests : IAsyncLifetime
     [Fact]
     public async Task StaleOwner_CompetingWithReacquisition_CannotComplete()
     {
-        RedisStore store = CreateStore(
-            leaseDuration: TimeSpan.FromMilliseconds(500));
+        RedisStore store = CreateStore(leaseDuration: TimeSpan.FromMilliseconds(500));
 
         IdempotencyKey key = CreateKey();
 
