@@ -325,7 +325,7 @@ public sealed class IdempotencyResponseEligibilityTests
 
     private static async Task<WebApplication> CreateAppAsync(
         Action<WebApplication> configure,
-        Action<IdempotencyAspNetBuilder> configureAspNetOptions)
+        Action<IdempotencyBuilder> configureAspNetOptions)
     {
         WebApplicationBuilder builder =
             WebApplication.CreateBuilder();

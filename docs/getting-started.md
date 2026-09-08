@@ -1,22 +1,25 @@
 # Getting Started
 
-Carried.Idempotency provides a storage-agnostic idempotency engine for .NET with ASP.NET Core integration and distributed Redis support.
+Carried.Idempotency provides a storage-agnostic idempotency engine for .NET and an
+optional ASP.NET Core integration for HTTP APIs.
 
-This guide covers the quickest way to start using Carried.Idempotency in an ASP.NET Core application or directly through the Core API.
+This guide covers the quickest way to start using both packages.
 
 ## ASP.NET Core
 
-Install the ASP.NET Core package:
+For ASP.NET Core applications, install:
 
 ```bash
 dotnet add package Carried.Idempotency.AspNet
 ```
 
-The ASP.NET Core package integrates the Core idempotency engine with the HTTP request pipeline.
+The ASP.NET Core package integrates the Core idempotency engine with the HTTP
+request pipeline.
 
 ### Register idempotency
 
-Register idempotency services during application startup and select a storage provider:
+Register idempotency services during application startup and select a storage
+provider:
 
 ```csharp
 builder.Services.AddIdempotency(options =>
@@ -25,11 +28,8 @@ builder.Services.AddIdempotency(options =>
 });
 ```
 
-The in-memory provider keeps idempotency state within a single application process.
-
-It is useful for development, testing, and applications where idempotency coordination does not need to span multiple application instances.
-
-For distributed applications, use the Redis provider described later in this guide.
+The in-memory provider is useful when idempotency state only needs to exist within
+a single application process.
 
 ### Add the middleware
 
@@ -39,9 +39,11 @@ Add the idempotency middleware to the application pipeline:
 app.UseIdempotency();
 ```
 
-`UseIdempotency()` should be registered after routing so endpoint metadata is available to the middleware.
+`UseIdempotency()` should be registered after routing so endpoint metadata is
+available to the middleware.
 
-Only endpoints explicitly configured to require idempotency are processed by the middleware.
+Only endpoints explicitly configured to require idempotency are processed by the
+middleware.
 
 ### Protect a Minimal API endpoint
 
@@ -57,7 +59,8 @@ app.MapPost("/orders", async () =>
 .RequireIdempotency();
 ```
 
-Clients calling this endpoint must provide an idempotency key using the `Idempotency-Key` request header:
+Clients calling this endpoint must provide an idempotency key using the
+`Idempotency-Key` request header:
 
 ```http
 POST /orders
@@ -67,7 +70,8 @@ Content-Type: application/json
 
 If the request completes successfully, its response can be retained for replay.
 
-Sending the same request again with the same idempotency key and request fingerprint can replay the retained response without executing the endpoint again.
+Sending the same request again with the same idempotency key can replay the
+retained response without executing the endpoint again.
 
 ### Protect a controller endpoint
 
@@ -88,9 +92,11 @@ The same idempotency semantics apply to Minimal APIs and controllers.
 
 ## Request behavior
 
-For an idempotency-enabled endpoint, the middleware associates the supplied idempotency key with a fingerprint of the request.
+For an idempotency-enabled endpoint, the middleware associates the supplied
+idempotency key with a fingerprint of the request.
 
-This allows the middleware to distinguish between a legitimate retry and reuse of the same key for a different request.
+This allows the middleware to distinguish between a legitimate retry and reuse of
+the same key for a different request.
 
 | Situation | Behavior |
 | --- | --- |
@@ -100,11 +106,12 @@ This allows the middleware to distinguish between a legitimate retry and reuse o
 | Same key and different request | An idempotency conflict is returned |
 | Expired entry | The key can be acquired again |
 
-A missing or invalid idempotency key on an endpoint that requires idempotency results in a `400 Bad Request`.
+A missing or invalid idempotency key on an endpoint that requires idempotency
+results in a `400 Bad Request`.
 
 ## Configure the engine
 
-Core behavior can be configured when registering ASP.NET Core idempotency:
+The Core engine can be configured when registering ASP.NET Core idempotency:
 
 ```csharp
 builder.Services.AddIdempotency(options =>
@@ -118,100 +125,27 @@ builder.Services.AddIdempotency(options =>
 
 ### Lease duration
 
-`LeaseDuration` controls how long an acquired idempotency key remains owned without a successful lease renewal.
+`LeaseDuration` controls how long an acquired idempotency key remains owned without
+a successful lease renewal.
 
 The default is **5 minutes**.
 
-While an operation is executing, the engine periodically renews its lease. This prevents another execution from acquiring the key while the current owner remains active.
-
-If the lease expires and another execution acquires the key, the previous owner becomes stale and cannot successfully complete, release, or renew the new ownership state.
+While an operation is executing, the engine renews its lease. This prevents another
+execution from acquiring the key while the current owner remains active.
 
 ### Completed retention
 
-`CompletedRetention` controls how long a completed result remains available for replay.
+`CompletedRetention` controls how long a completed result remains available for
+replay.
 
 The default is **24 hours**.
 
 After the completed entry expires, the idempotency key can be acquired again.
 
-## Using Redis
-
-For applications where idempotency state must be coordinated across multiple processes or application instances, install the Redis provider:
-
-```bash
-dotnet add package Carried.Idempotency.Redis
-```
-
-### Register the Redis connection
-
-Register a long-lived `IConnectionMultiplexer` with the application:
-
-```csharp
-builder.Services.AddSingleton<IConnectionMultiplexer>(_ =>
-    ConnectionMultiplexer.Connect(
-        builder.Configuration.GetConnectionString("Redis")!));
-```
-
-Then select Redis when configuring idempotency:
-
-```csharp
-builder.Services.AddIdempotency(options =>
-{
-    options.UseRedis();
-});
-```
-
-`UseRedis()` resolves `IConnectionMultiplexer` from the application's service provider and obtains an `IDatabase` from it.
-
-The application owns the `IConnectionMultiplexer` and its lifetime. The Redis idempotency provider does not create or dispose the multiplexer.
-
-### Configure the Redis key prefix
-
-Redis keys use the following prefix by default:
-
-```text
-carried:idempotency:
-```
-
-A custom prefix can be configured:
-
-```csharp
-builder.Services.AddIdempotency(options =>
-{
-    options.UseRedis(redis =>
-    {
-        redis.KeyPrefix = "orders-api:idempotency:";
-    });
-});
-```
-
-Use different prefixes when applications share the same Redis database but should not share idempotency state.
-
-### Supply an IDatabase directly
-
-Applications that need explicit control over database selection can supply an `IDatabase`:
-
-```csharp
-IConnectionMultiplexer connection = /* ... */;
-IDatabase database = connection.GetDatabase();
-
-builder.Services.AddIdempotency(options =>
-{
-    options.UseRedis(database);
-});
-```
-
-### Redis timing requirements
-
-The Redis provider represents lease and retention durations in milliseconds.
-
-Both `LeaseDuration` and `CompletedRetention` must therefore be at least one millisecond.
-
-The provider performs state transitions atomically and uses Redis server time when evaluating leases and expiration.
-
 ## Using the Core package directly
 
-Applications that do not need ASP.NET Core integration can use `Carried.Idempotency` directly.
+Applications that do not need ASP.NET Core integration can use
+`Carried.Idempotency` directly.
 
 Install the Core package:
 
@@ -233,7 +167,8 @@ var key = new IdempotencyKey(
     value: "550e8400-e29b-41d4-a716-446655440000");
 ```
 
-The scope identifies where the key is unique. This allows the same key value to be used independently in different scopes.
+The scope identifies where the key is unique. This allows the same key value to be
+used independently in different scopes.
 
 Execute an idempotent operation:
 
@@ -249,26 +184,8 @@ var result = await idempotency.ExecuteAsync(
     });
 ```
 
-The fingerprint identifies the operation associated with the key. Reusing an active or retained key with a different fingerprint results in an idempotency conflict.
-
-### Core with Redis
-
-Redis can also back the Core service directly without ASP.NET Core:
-
-```csharp
-IConnectionMultiplexer connection = /* ... */;
-IDatabase database = connection.GetDatabase();
-
-var options = new IdempotencyOptions
-{
-    LeaseDuration = TimeSpan.FromMinutes(5),
-    CompletedRetention = TimeSpan.FromHours(24)
-};
-
-var idempotency = IdempotencyService.CreateRedis(
-    database,
-    options);
-```
+The fingerprint identifies the operation associated with the key. Reusing an
+active key with a different fingerprint results in an idempotency conflict.
 
 ## Complete or release an operation
 
@@ -282,38 +199,43 @@ Return `Complete` when the result should be retained for future replay:
 return IdempotencyOperationResult<Order>.Complete(order);
 ```
 
-A later execution using the same key and fingerprint receives the retained result instead of executing the operation again.
+A later execution using the same key and fingerprint receives the retained result
+instead of executing the operation again.
 
 ### Release
 
-Return `Release` when the result should be returned to the current caller without being retained:
+Return `Release` when the result should be returned to the current caller without
+being retained:
 
 ```csharp
 return IdempotencyOperationResult<Order>.Release(order);
 ```
 
-Ownership of the idempotency key is released, allowing a subsequent execution to acquire the key and execute the operation again.
+Ownership of the idempotency key is released, allowing a subsequent execution to
+acquire the key and execute the operation again.
 
 ## Core exceptions
 
-When using the Core engine directly, idempotency conditions are represented by specific exceptions:
+When using the Core engine directly, idempotency conditions are represented by
+specific exceptions:
 
 - `IdempotencyInProgressException` — another operation currently owns the key.
 - `IdempotencyConflictException` — the key is associated with a different operation.
-- `IdempotencyLeaseLostException` — ownership was lost before the requested state transition could be applied.
+- `IdempotencyLeaseLostException` — ownership was lost before the operation could
+  be completed.
 
-ASP.NET Core integration handles these engine conditions and translates them into HTTP responses.
+ASP.NET Core integration handles these engine conditions and translates them into
+HTTP responses.
 
 ## Next steps
 
 Once the basic integration is working, continue with the relevant guides:
 
-- **Idempotency Semantics** — understand ownership, leases, completion, release, and replay.
+- **Idempotency Semantics** — understand ownership, leases, completion, and replay.
 - **ASP.NET Core Policies** — customize behavior globally or for individual endpoints.
 - **Request Fingerprinting** — understand how requests are identified and extend fingerprints.
 - **Response Replay** — configure which responses and headers can be retained.
-- **Redis** — configure distributed idempotency coordination.
-- **Custom Stores** — implement another `IIdempotencyStore` provider.
+- **Custom Stores** — implement a persistent or distributed `IIdempotencyStore`.
 - **Observability** — integrate lifecycle events, logging, and metrics.
 
 For individual types and members, see the **API Reference**.

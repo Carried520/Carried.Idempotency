@@ -2,7 +2,7 @@
 
 ## About
 
-A lightweight, storage-agnostic idempotency engine for .NET with ASP.NET Core integration and distributed Redis support.
+A lightweight, storage-agnostic idempotency engine for .NET with ASP.NET Core integration.
 
 `Carried.Idempotency` provides primitives for coordinating idempotent operations using
 idempotency keys, operation fingerprints, leases, and retained results.
@@ -10,9 +10,7 @@ idempotency keys, operation fingerprints, leases, and retained results.
 The project consists of:
 
 - **Carried.Idempotency** — Core idempotency engine with no ASP.NET Core dependency.
-- **Carried.Idempotency.DependencyInjection** — Dependency injection infrastructure for configuring idempotency providers.
 - **Carried.Idempotency.AspNet** — ASP.NET Core integration built on top of the Core engine.
-- **Carried.Idempotency.Redis** — Redis storage provider for distributed idempotency coordination.
 
 ## 📥 Installation
 
@@ -24,17 +22,6 @@ dotnet add package Carried.Idempotency
 
 NuGet: [Carried.Idempotency](TODO_NUGET_LINK)
 
-### Dependency Injection
-
-```bash
-dotnet add package Carried.Idempotency.DependencyInjection
-```
-
-NuGet: [Carried.Idempotency.DependencyInjection](TODO_NUGET_LINK)
-
-> Most applications do not need to install this package directly. Provider packages
-> and integrations reference it as required.
-
 ### ASP.NET Core
 
 ```bash
@@ -42,14 +29,6 @@ dotnet add package Carried.Idempotency.AspNet
 ```
 
 NuGet: [Carried.Idempotency.AspNet](TODO_NUGET_LINK)
-
-### Redis
-
-```bash
-dotnet add package Carried.Idempotency.Redis
-```
-
-NuGet: [Carried.Idempotency.Redis](TODO_NUGET_LINK)
 
 ## 🚀 Getting Started
 
@@ -110,12 +89,12 @@ A subsequent execution can acquire the key and execute the operation again.
 
 ## 🔑 Idempotency Behavior
 
-| Situation                           | Behavior                                          |
-|-------------------------------------|---------------------------------------------------|
+| Situation                           | Behavior                                         |
+|-------------------------------------|--------------------------------------------------|
 | New idempotency key                 | Ownership is acquired and the operation executes |
 | Same key and operation while active | Operation is already in progress                 |
 | Same key and completed operation    | Previously retained result is replayed           |
-| Same key for a different operation  | Conflict                                          |
+| Same key for a different operation  | Conflict                                         |
 | Expired entry                       | The key can be acquired again                    |
 
 ### Exceptions
@@ -311,7 +290,7 @@ app.MapPost("/orders/add", async () =>
 .RequireIdempotency("strict");
 ```
 
-or on a controller:
+or on controller:
 
 ```csharp
 [RequireIdempotency("strict")]
@@ -322,113 +301,16 @@ public async Task<IActionResult> AddOrder()
 }
 ```
 
-## 💾 Storage Providers
+## Storage Providers
 
-The Core package includes an in-memory store. Redis is available as a separate
-provider package.
+The Core package includes an in-memory store, with built-in ASP.NET Core registration
+available through `UseInMemory()`. Additional storage providers are planned.
 
-| Provider              | Package                      | Status       |
-|-----------------------|------------------------------|--------------|
+| Provider              | Package                      | Status      |
+|-----------------------|------------------------------|-------------|
 | In-memory             | `Carried.Idempotency`        | ✅ Available |
-| Redis                 | `Carried.Idempotency.Redis`  | ✅ Available |
-| Entity Framework Core | `Carried.Idempotency.EFCore` | 🛠️ Planned   |
-
-## 🔴 Redis
-
-`Carried.Idempotency.Redis` provides distributed idempotency coordination backed by
-Redis.
-
-The provider performs state transitions atomically and uses Redis server time for
-lease and expiration decisions.
-
-### ASP.NET Core Registration
-
-Register a long-lived `IConnectionMultiplexer` with the application:
-
-```csharp
-builder.Services.AddSingleton<IConnectionMultiplexer>(_ =>
-    ConnectionMultiplexer.Connect(
-        builder.Configuration.GetConnectionString("Redis")!));
-```
-
-Then configure Redis as the idempotency provider:
-
-```csharp
-builder.Services.AddIdempotency(options =>
-{
-    options.UseRedis();
-});
-```
-
-`UseRedis()` resolves the registered `IConnectionMultiplexer` and obtains an
-`IDatabase` from it.
-
-> The application owns the `IConnectionMultiplexer` and its lifetime.
-> `Carried.Idempotency.Redis` does not dispose it.
-
-### Redis Configuration
-
-Redis-specific options can be configured through `UseRedis`:
-
-```csharp
-builder.Services.AddIdempotency(options =>
-{
-    options.UseRedis(redis =>
-    {
-        redis.KeyPrefix = "my-app:idempotency:";
-    });
-});
-```
-
-`KeyPrefix` controls the namespace used for idempotency keys stored in Redis.
-
-The default prefix is:
-
-```text
-carried:idempotency:
-```
-
-Applications sharing the same Redis database should use different prefixes when
-their idempotency state must remain isolated.
-
-### Explicit IDatabase
-
-An `IDatabase` can also be supplied directly:
-
-```csharp
-IConnectionMultiplexer connection = /* ... */;
-IDatabase database = connection.GetDatabase();
-
-builder.Services.AddIdempotency(options =>
-{
-    options.UseRedis(database);
-});
-```
-
-This overload is useful when the application needs explicit control over Redis
-database selection or database creation.
-
-### Core Usage
-
-The Redis-backed service can also be created directly without ASP.NET Core:
-
-```csharp
-IConnectionMultiplexer connection = /* ... */;
-IDatabase database = connection.GetDatabase();
-
-var options = new IdempotencyOptions
-{
-    LeaseDuration = TimeSpan.FromMinutes(5),
-    CompletedRetention = TimeSpan.FromHours(24)
-};
-
-var idempotency = IdempotencyService.CreateRedis(
-    database,
-    options);
-```
-
-Redis requires `LeaseDuration` and `CompletedRetention` to be at least one
-millisecond.
+| Redis                 | `Carried.Idempotency.Redis`  | 🛠️ Planned |
+| Entity Framework Core | `Carried.Idempotency.EFCore` | 🛠️ Planned |
 
 ## 🔌 Custom Stores
 
