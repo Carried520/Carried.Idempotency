@@ -89,7 +89,7 @@ public sealed class ModelBuilderExtensionsTests
             });
 
         Assert.Contains(
-            "Table name cannot be empty",
+            "The idempotency table name cannot be empty or whitespace.",
             exception.Message);
     }
 
