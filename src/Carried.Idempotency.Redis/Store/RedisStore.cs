@@ -1,5 +1,6 @@
 using Carried.Idempotency.Options;
 using Carried.Idempotency.Redis.KeyBuilder;
+using Carried.Idempotency.Redis.Options;
 using Carried.Idempotency.Redis.Scripts;
 using Carried.Idempotency.Store;
 using StackExchange.Redis;
@@ -10,21 +11,26 @@ internal sealed class RedisStore : IIdempotencyStore
 {
     private readonly IDatabase _database;
     private readonly IdempotencyOptions _options;
+    private readonly string _keyPrefix;
 
-    public RedisStore(IDatabase database, IdempotencyOptions options)
+    public RedisStore(IDatabase database, IdempotencyOptions options, RedisIdempotencyOptions redisIdempotencyOptions)
     {
         ArgumentNullException.ThrowIfNull(database);
         ArgumentNullException.ThrowIfNull(options);
+        ArgumentNullException.ThrowIfNull(redisIdempotencyOptions);
 
         _database = database;
         _options = options;
+        _keyPrefix = redisIdempotencyOptions.KeyPrefix;
     }
 
     public async ValueTask<IdempotencyAcquireResult> TryAcquireAsync(IdempotencyKey key,
         string fingerprint,
         CancellationToken cancellationToken = default)
     {
-        RedisKey redisKey = RedisKeyMapper.From(key);
+        cancellationToken.ThrowIfCancellationRequested();
+
+        RedisKey redisKey = RedisKeyMapper.From(key, _keyPrefix);
         var ownerToken = Guid.NewGuid();
 
         var acquireResult = (RedisResult[])(await _database.ScriptEvaluateAsync(
@@ -40,9 +46,11 @@ internal sealed class RedisStore : IIdempotencyStore
         byte[] payload,
         CancellationToken cancellationToken = default)
     {
+        cancellationToken.ThrowIfCancellationRequested();
+
         ArgumentNullException.ThrowIfNull(payload);
 
-        RedisKey redisKey = RedisKeyMapper.From(key);
+        RedisKey redisKey = RedisKeyMapper.From(key, _keyPrefix);
 
         RedisResult completeResult = (await _database.ScriptEvaluateAsync(
             RedisScripts.Complete,
@@ -61,7 +69,9 @@ internal sealed class RedisStore : IIdempotencyStore
         Guid ownerToken,
         CancellationToken cancellationToken = default)
     {
-        RedisKey redisKey = RedisKeyMapper.From(key);
+        cancellationToken.ThrowIfCancellationRequested();
+
+        RedisKey redisKey = RedisKeyMapper.From(key, _keyPrefix);
 
         RedisResult releaseResult = await _database.ScriptEvaluateAsync(
             RedisScripts.Release,
@@ -80,7 +90,9 @@ internal sealed class RedisStore : IIdempotencyStore
         Guid ownerToken,
         CancellationToken cancellationToken = default)
     {
-        RedisKey redisKey = RedisKeyMapper.From(key);
+        cancellationToken.ThrowIfCancellationRequested();
+
+        RedisKey redisKey = RedisKeyMapper.From(key, _keyPrefix);
 
         RedisResult renewLeaseResult = await _database.ScriptEvaluateAsync(
             RedisScripts.RenewLease,

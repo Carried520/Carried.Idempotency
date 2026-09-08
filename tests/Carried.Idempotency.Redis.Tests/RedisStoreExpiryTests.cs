@@ -1,4 +1,5 @@
 using Carried.Idempotency.Options;
+using Carried.Idempotency.Redis.Options;
 using Carried.Idempotency.Redis.Store;
 using Carried.Idempotency.Store;
 using StackExchange.Redis;
@@ -31,7 +32,8 @@ public sealed class RedisStoreExpiryTests : IAsyncLifetime
             {
                 LeaseDuration = LeaseDuration,
                 CompletedRetention = CompletedRetention
-            });
+            },
+            new RedisIdempotencyOptions());
     }
 
     public async Task DisposeAsync()
@@ -230,7 +232,7 @@ public sealed class RedisStoreExpiryTests : IAsyncLifetime
             acquired.OwnerToken!.Value);
 
         Assert.True(renewed);
-        
+
         await Task.Delay(TimeSpan.FromMilliseconds(100));
 
         IdempotencyAcquireResult result =

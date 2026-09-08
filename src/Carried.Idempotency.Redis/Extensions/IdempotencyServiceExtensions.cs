@@ -1,4 +1,5 @@
 using Carried.Idempotency.Options;
+using Carried.Idempotency.Redis.Options;
 using Carried.Idempotency.Redis.Store;
 using StackExchange.Redis;
 
@@ -20,6 +21,10 @@ public static class IdempotencyServiceExtensions
         /// <param name="idempotencyOptions">
         /// The options that configure idempotency behavior.
         /// </param>
+        /// <param name="redisIdempotencyOptions">
+        /// The Redis-specific options used to configure key namespacing,
+        /// or <see langword="null"/> to use the default options.
+        /// </param>
         /// <param name="timeProvider">
         /// The time provider to use, or <see langword="null"/> to use
         /// <see cref="TimeProvider.System"/>.
@@ -31,23 +36,36 @@ public static class IdempotencyServiceExtensions
         /// Thrown when the lease duration or completed retention is less than
         /// one millisecond.
         /// </exception>
-        public static IdempotencyService CreateRedis(IDatabase database,
+        /// <exception cref="ArgumentNullException">
+        /// Thrown when <paramref name="database"/> or
+        /// <paramref name="idempotencyOptions"/> is null.
+        /// </exception>
+        /// <exception cref="ArgumentException">
+        /// Thrown when the Redis key prefix is null, empty, or consists only of white-space characters.
+        /// </exception>
+        public static IdempotencyService CreateRedis(
+            IDatabase database,
             IdempotencyOptions idempotencyOptions,
+            RedisIdempotencyOptions? redisIdempotencyOptions = null,
             TimeProvider? timeProvider = null)
         {
             ArgumentNullException.ThrowIfNull(database);
             ArgumentNullException.ThrowIfNull(idempotencyOptions);
+            
+            redisIdempotencyOptions ??= new RedisIdempotencyOptions();
 
-            ValidateOptions(idempotencyOptions);
+            ValidateOptions(idempotencyOptions, redisIdempotencyOptions);
 
-            var redisStore = new RedisStore(database, idempotencyOptions);
+            var redisStore = new RedisStore(database, idempotencyOptions, redisIdempotencyOptions);
 
             return IdempotencyService.Create(redisStore, idempotencyOptions, timeProvider);
         }
     }
 
-    private static void ValidateOptions(IdempotencyOptions options)
+    private static void ValidateOptions(IdempotencyOptions options, RedisIdempotencyOptions redisOptions)
     {
+        ArgumentException.ThrowIfNullOrWhiteSpace(redisOptions.KeyPrefix);
+
         if (options.LeaseDuration < TimeSpan.FromMilliseconds(1))
         {
             throw new ArgumentOutOfRangeException(

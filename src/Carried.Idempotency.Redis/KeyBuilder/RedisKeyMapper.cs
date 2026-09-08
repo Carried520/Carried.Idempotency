@@ -7,7 +7,7 @@ namespace Carried.Idempotency.Redis.KeyBuilder;
 
 internal static class RedisKeyMapper
 {
-    internal static RedisKey From(IdempotencyKey idempotencyKey)
+    internal static RedisKey From(IdempotencyKey idempotencyKey, string keyPrefix)
     {
         Span<byte> length = stackalloc byte[sizeof(int)];
 
@@ -26,6 +26,6 @@ internal static class RedisKeyMapper
 
         byte[] result = hash.GetHashAndReset();
 
-        return $"carried:idempotency:{Convert.ToHexString(result)}";
+        return $"{keyPrefix}{Convert.ToHexString(result)}";
     }
 }
