@@ -8,8 +8,9 @@ namespace Carried.Idempotency.EFCore.Tests;
 
 public sealed class PostgreSqlStoreTests
 {
-    private const string ConnectionString =
-        "Host=localhost;Port=5432;Database=carried_idempotency_tests;Username=postgres;Password=root";
+    private static string ConnectionString =>
+        Environment.GetEnvironmentVariable("CARRIED_TEST_POSTGRES")
+        ?? "Host=localhost;Port=5432;Database=carried_idempotency_tests;Username=postgres;Password=postgres";
 
     [Fact]
     public async Task TryAcquireAsync_WhenMissing_Acquires()

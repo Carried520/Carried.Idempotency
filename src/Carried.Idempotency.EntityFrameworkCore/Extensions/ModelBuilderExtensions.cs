@@ -23,9 +23,6 @@ public static class ModelBuilderExtensions
         /// The same <see cref="ModelBuilder"/> instance so that additional
         /// model configuration can be chained.
         /// </returns>
-        /// <exception cref="ArgumentNullException">
-        /// Thrown when <paramref name="modelBuilder"/> is <see langword="null"/>.
-        /// </exception>
         /// <exception cref="ArgumentException">
         /// Thrown when the configured table name is empty or consists only of
         /// whitespace.

@@ -30,9 +30,6 @@ public static class IdempotencyBuilderExtensions
         /// idempotency entity configuration by calling <c>modelBuilder.AddIdempotency()</c>
         /// from <see cref="DbContext.OnModelCreating(ModelBuilder)"/>.
         /// </remarks>
-        /// <exception cref="ArgumentNullException">
-        /// Thrown when <paramref name="builder"/> is <see langword="null"/>.
-        /// </exception>
         public IdempotencyBuilder UseDbContext<TContext>() where TContext : DbContext
         {
             ArgumentNullException.ThrowIfNull(builder);
