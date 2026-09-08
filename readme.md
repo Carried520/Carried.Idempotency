@@ -1,6 +1,6 @@
 # Carried.Idempotency
 
-A lightweight, storage-agnostic idempotency engine for .NET with ASP.NET Core integration and distributed Redis support.
+A lightweight, storage-agnostic idempotency engine for .NET with ASP.NET Core integration and distributed storage providers.
 
 ## Packages
 
@@ -10,6 +10,7 @@ A lightweight, storage-agnostic idempotency engine for .NET with ASP.NET Core in
 | `Carried.Idempotency.DependencyInjection` | Dependency injection infrastructure for providers |
 | `Carried.Idempotency.AspNet` | ASP.NET Core integration |
 | `Carried.Idempotency.Redis` | Distributed Redis provider |
+| `Carried.Idempotency.EntityFrameworkCore` | Entity Framework Core relational provider |
 
 ## 📥 Installation
 
@@ -23,6 +24,12 @@ dotnet add package Carried.Idempotency.AspNet
 
 ```bash
 dotnet add package Carried.Idempotency.Redis
+```
+
+### Entity Framework Core
+
+```bash
+dotnet add package Carried.Idempotency.EntityFrameworkCore
 ```
 
 ### Core
@@ -102,6 +109,35 @@ builder.Services.AddIdempotency(options =>
 
 The application owns the `IConnectionMultiplexer` and its lifetime.
 
+### Entity Framework Core
+
+Register your `DbContext` and select the Entity Framework Core provider:
+
+```csharp
+builder.Services.AddDbContext<AppDbContext>(options =>
+{
+    // Configure your database provider.
+});
+
+builder.Services.AddIdempotency(options =>
+{
+    options.UseDbContext<AppDbContext>();
+});
+```
+
+Add the idempotency model configuration to your `DbContext`:
+
+```csharp
+protected override void OnModelCreating(ModelBuilder modelBuilder)
+{
+    base.OnModelCreating(modelBuilder);
+
+    modelBuilder.AddIdempotency();
+}
+```
+
+The idempotency table is managed through your application's normal Entity Framework Core migrations.
+
 ### Core
 
 The Core engine can be used independently of ASP.NET Core:
@@ -131,9 +167,9 @@ var result = await idempotency.ExecuteAsync(
 |---|---|---|
 | In-memory | `Carried.Idempotency` | ✅ Available |
 | Redis | `Carried.Idempotency.Redis` | ✅ Available |
-| Entity Framework Core | `Carried.Idempotency.EFCore` | 🛠️ Planned |
+| Entity Framework Core | `Carried.Idempotency.EntityFrameworkCore` | ✅ Available |
 
-The in-memory provider is intended for single-process use. Redis provides distributed coordination across application instances.
+The in-memory provider is intended for single-process use. Redis and Entity Framework Core support coordination across application instances using shared storage.
 
 Custom providers can be implemented using `IIdempotencyStore`.
 

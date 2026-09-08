@@ -1,14 +1,15 @@
 # Carried.Idempotency
 
-**Carried.Idempotency** is a lightweight, storage-agnostic idempotency engine for .NET with ASP.NET Core integration and distributed Redis support.
+**Carried.Idempotency** is a lightweight, storage-agnostic idempotency engine for .NET with ASP.NET Core integration and multiple persistence providers.
 
 It coordinates idempotent operations using idempotency keys, operation fingerprints, leases, and retained results, helping applications prevent duplicate execution, coordinate concurrent requests, and safely replay completed operations.
 
 ## Features
 
-- **Storage-agnostic Core** — use the built-in in-memory store, the Redis provider, or implement `IIdempotencyStore` for another backend.
+- **Storage-agnostic Core** — use the built-in in-memory store, Redis, Entity Framework Core, or implement `IIdempotencyStore` for another backend.
 - **Distributed Redis provider** — coordinate idempotency across application instances using atomic Redis operations.
-- **Lease-based ownership** — coordinates concurrent execution and prevents stale owners from completing, releasing, or renewing operations they no longer own.
+- **Entity Framework Core provider** — persist idempotency state through an application's relational database.
+- **Lease-based ownership** — prevents stale owners from completing, releasing, or renewing operations they no longer own.
 - **Result replay** — completed operation results can be retained and returned without executing the operation again.
 - **Conflict detection** — detects when an idempotency key is reused for a different operation.
 - **ASP.NET Core integration** — protect Minimal API endpoints or controllers with opt-in idempotency.
@@ -26,6 +27,7 @@ It coordinates idempotent operations using idempotency keys, operation fingerpri
 | `Carried.Idempotency.DependencyInjection` | Dependency injection infrastructure for configuring idempotency providers. |
 | `Carried.Idempotency.AspNet` | ASP.NET Core integration built on top of the Core engine. |
 | `Carried.Idempotency.Redis` | Redis provider for distributed idempotency coordination. |
+| `Carried.Idempotency.EntityFrameworkCore` | Entity Framework Core relational persistence provider. |
 
 ## Quick Start
 
@@ -75,7 +77,7 @@ A repeated request using the same key and request fingerprint can receive the pr
 Reusing the same key for a different request results in an idempotency conflict.
 
 > The in-memory provider stores idempotency state within a single application process.
-> For applications running across multiple instances, use a distributed provider such as Redis.
+> For shared persistence across application instances, use Redis or Entity Framework Core.
 
 ## Redis
 
@@ -85,7 +87,7 @@ Install the Redis provider:
 dotnet add package Carried.Idempotency.Redis
 ```
 
-Register a long-lived `IConnectionMultiplexer` with the application:
+Register a long-lived `IConnectionMultiplexer`:
 
 ```csharp
 builder.Services.AddSingleton<IConnectionMultiplexer>(_ =>
@@ -102,9 +104,7 @@ builder.Services.AddIdempotency(options =>
 });
 ```
 
-`UseRedis()` resolves the registered `IConnectionMultiplexer` and obtains an `IDatabase` from it.
-
-The application owns the connection multiplexer and its lifetime. `Carried.Idempotency.Redis` does not dispose it.
+The application owns the `IConnectionMultiplexer` and its lifetime.
 
 Redis-specific configuration can be supplied when selecting the provider:
 
@@ -124,9 +124,60 @@ The default Redis key prefix is:
 carried:idempotency:
 ```
 
-Applications sharing a Redis database can use different prefixes to isolate their idempotency state.
+The Redis provider performs state transitions atomically and uses Redis server time for lease and expiration decisions.
 
-The Redis provider performs its state transitions atomically and uses Redis server time for lease and expiration decisions.
+## Entity Framework Core
+
+Install the Entity Framework Core provider:
+
+```bash
+dotnet add package Carried.Idempotency.EntityFrameworkCore
+```
+
+Register the application's `DbContext` normally, then select it as the idempotency provider:
+
+```csharp
+builder.Services.AddDbContext<AppDbContext>(options =>
+{
+    // Configure the application's database provider.
+});
+
+builder.Services.AddIdempotency(options =>
+{
+    options.UseDbContext<AppDbContext>();
+});
+```
+
+The idempotency entity must also be added to the context model:
+
+```csharp
+protected override void OnModelCreating(ModelBuilder modelBuilder)
+{
+    base.OnModelCreating(modelBuilder);
+
+    modelBuilder.AddIdempotency();
+}
+```
+
+The idempotency table is managed through the application's normal Entity Framework Core migrations.
+
+By default, the table is named:
+
+```text
+__CarriedIdempotency
+```
+
+The table name and schema can be customized:
+
+```csharp
+modelBuilder.AddIdempotency(options =>
+{
+    options.TableName = "IdempotencyEntries";
+    options.Schema = "infrastructure";
+});
+```
+
+The Entity Framework Core provider is intended for relational providers and supports shared idempotency state across application instances using the same database.
 
 ## Core
 
@@ -179,6 +230,16 @@ var idempotency = IdempotencyService.CreateRedis(
     options);
 ```
 
+Or Entity Framework Core:
+
+```csharp
+await using var context = new AppDbContext(/* ... */);
+
+var idempotency = IdempotencyService.CreateEfCore(context);
+```
+
+When using Entity Framework Core directly, the caller retains ownership of the `DbContext`.
+
 ## How It Works
 
 When an operation is executed with an idempotency key:
@@ -198,7 +259,8 @@ If ownership is lost before the requested state transition can be applied, the o
 | Provider | Package | Use case |
 | --- | --- | --- |
 | In-memory | `Carried.Idempotency` | Single-process applications, development, and testing |
-| Redis | `Carried.Idempotency.Redis` | Distributed applications and multiple application instances |
+| Redis | `Carried.Idempotency.Redis` | Distributed applications using Redis |
+| Entity Framework Core | `Carried.Idempotency.EntityFrameworkCore` | Applications using a shared relational database |
 
 Additional providers can be implemented using `IIdempotencyStore`.
 
@@ -210,6 +272,7 @@ Use the documentation and API reference to learn more about:
 - Core idempotency semantics
 - ASP.NET Core integration
 - Redis
+- Entity Framework Core
 - Policies
 - Request fingerprinting
 - Response replay

@@ -7,12 +7,13 @@ on:
   workflow_dispatch:
     inputs:
       version:
-        description: "Package version, e.g. v1.1.0"
+        description: "Package version, e.g. v1.2.0"
         required: true
         type: string
 
 env:
   RELEASE_VERSION: ${{ github.event.release.tag_name || inputs.version }}
+  CARRIED_TEST_POSTGRES: "Host=localhost;Port=5432;Database=carried_idempotency_tests;Username=postgres;Password=root"
 
 permissions:
   contents: read
@@ -30,6 +31,20 @@ jobs:
           - 6379:6379
         options: >-
           --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+      postgres:
+        image: postgres:18
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: carried_idempotency_tests
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d carried_idempotency_tests"
           --health-interval 10s
           --health-timeout 5s
           --health-retries 5
@@ -84,6 +99,14 @@ jobs:
       - name: Pack Redis
         run: >
           dotnet pack src/Carried.Idempotency.Redis/Carried.Idempotency.Redis.csproj
+          --configuration Release
+          --no-build
+          --output ./artifacts
+          -p:PackageVersion=${{ steps.version.outputs.version }}
+
+      - name: Pack Entity Framework Core
+        run: >
+          dotnet pack src/Carried.Idempotency.EntityFrameworkCore/Carried.Idempotency.EntityFrameworkCore.csproj
           --configuration Release
           --no-build
           --output ./artifacts

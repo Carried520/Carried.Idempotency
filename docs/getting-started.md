@@ -1,6 +1,6 @@
 # Getting Started
 
-Carried.Idempotency provides a storage-agnostic idempotency engine for .NET with ASP.NET Core integration and distributed Redis support.
+Carried.Idempotency provides a storage-agnostic idempotency engine for .NET with ASP.NET Core integration and multiple persistence providers.
 
 This guide covers the quickest way to start using Carried.Idempotency in an ASP.NET Core application or directly through the Core API.
 
@@ -29,7 +29,7 @@ The in-memory provider keeps idempotency state within a single application proce
 
 It is useful for development, testing, and applications where idempotency coordination does not need to span multiple application instances.
 
-For distributed applications, use the Redis provider described later in this guide.
+For applications that require shared persistence across application instances, use the Redis or Entity Framework Core providers described later in this guide.
 
 ### Add the middleware
 
@@ -136,7 +136,7 @@ After the completed entry expires, the idempotency key can be acquired again.
 
 ## Using Redis
 
-For applications where idempotency state must be coordinated across multiple processes or application instances, install the Redis provider:
+For applications where idempotency state must be coordinated through Redis, install the Redis provider:
 
 ```bash
 dotnet add package Carried.Idempotency.Redis
@@ -209,6 +209,99 @@ Both `LeaseDuration` and `CompletedRetention` must therefore be at least one mil
 
 The provider performs state transitions atomically and uses Redis server time when evaluating leases and expiration.
 
+## Using Entity Framework Core
+
+For applications that want to persist idempotency state through an existing relational database, install the Entity Framework Core provider:
+
+```bash
+dotnet add package Carried.Idempotency.EntityFrameworkCore
+```
+
+The application must also reference and configure the Entity Framework Core database provider it uses, such as PostgreSQL or SQL Server.
+
+### Register the DbContext
+
+Register the application's `DbContext` normally:
+
+```csharp
+builder.Services.AddDbContext<AppDbContext>(options =>
+{
+    // Configure the application's database provider.
+});
+```
+
+Then select the Entity Framework Core idempotency provider:
+
+```csharp
+builder.Services.AddIdempotency(options =>
+{
+    options.UseDbContext<AppDbContext>();
+});
+```
+
+The `DbContext` remains owned by the application's dependency injection container. Carried.Idempotency uses the registered context rather than creating or managing one itself.
+
+### Add the idempotency model
+
+The idempotency entity must be included in the application's EF Core model.
+
+Call `AddIdempotency()` from `OnModelCreating`:
+
+```csharp
+protected override void OnModelCreating(ModelBuilder modelBuilder)
+{
+    base.OnModelCreating(modelBuilder);
+
+    modelBuilder.AddIdempotency();
+}
+```
+
+The idempotency table is then managed through the application's normal EF Core migrations:
+
+```bash
+dotnet ef migrations add AddIdempotency
+dotnet ef database update
+```
+
+By default, the table is named:
+
+```text
+__CarriedIdempotency
+```
+
+### Configure the table
+
+The table name and schema can be customized when registering the model:
+
+```csharp
+protected override void OnModelCreating(ModelBuilder modelBuilder)
+{
+    base.OnModelCreating(modelBuilder);
+
+    modelBuilder.AddIdempotency(options =>
+    {
+        options.TableName = "IdempotencyEntries";
+        options.Schema = "infrastructure";
+    });
+}
+```
+
+Because this configuration is part of the EF Core model, changes to the table name or schema should be applied through the application's migrations.
+
+### Key length
+
+The Entity Framework Core provider stores the idempotency scope and key as a composite primary key.
+
+Both the scope and key are limited to **256 characters**. Values exceeding this limit are rejected before a database operation is performed.
+
+### Entity Framework Core provider behavior
+
+The provider uses conditional database updates and deletes to preserve idempotency ownership and lease semantics.
+
+A stale owner cannot complete, release, or renew an entry after its lease expires or another execution takes ownership.
+
+The provider is intended for relational Entity Framework Core providers.
+
 ## Using the Core package directly
 
 Applications that do not need ASP.NET Core integration can use `Carried.Idempotency` directly.
@@ -270,6 +363,43 @@ var idempotency = IdempotencyService.CreateRedis(
     options);
 ```
 
+### Core with Entity Framework Core
+
+Entity Framework Core can also back the Core service directly without dependency injection:
+
+```csharp
+await using var context = new AppDbContext(/* ... */);
+
+var idempotency = IdempotencyService.CreateEfCore(context);
+```
+
+The context model must still include the idempotency configuration:
+
+```csharp
+protected override void OnModelCreating(ModelBuilder modelBuilder)
+{
+    base.OnModelCreating(modelBuilder);
+
+    modelBuilder.AddIdempotency();
+}
+```
+
+The caller retains ownership of the `DbContext` and is responsible for its lifetime.
+
+Custom engine options can also be supplied:
+
+```csharp
+var options = new IdempotencyOptions
+{
+    LeaseDuration = TimeSpan.FromMinutes(5),
+    CompletedRetention = TimeSpan.FromHours(24)
+};
+
+var idempotency = IdempotencyService.CreateEfCore(
+    context,
+    options);
+```
+
 ## Complete or release an operation
 
 An operation explicitly determines whether its result should be retained.
@@ -312,7 +442,8 @@ Once the basic integration is working, continue with the relevant guides:
 - **ASP.NET Core Policies** — customize behavior globally or for individual endpoints.
 - **Request Fingerprinting** — understand how requests are identified and extend fingerprints.
 - **Response Replay** — configure which responses and headers can be retained.
-- **Redis** — configure distributed idempotency coordination.
+- **Redis** — configure Redis-backed idempotency coordination.
+- **Entity Framework Core** — configure relational database-backed idempotency.
 - **Custom Stores** — implement another `IIdempotencyStore` provider.
 - **Observability** — integrate lifecycle events, logging, and metrics.
 
