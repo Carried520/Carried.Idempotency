@@ -156,36 +156,6 @@ public sealed class IdempotencyService
     }
 
     /// <summary>
-    /// Creates an idempotency service using the specified store and default serializer.
-    /// </summary>
-    /// <param name="store">
-    /// The idempotency store used to coordinate operation state.
-    /// </param>
-    /// <param name="options">
-    /// The options that configure idempotency behavior.
-    /// </param>
-    /// <param name="timeProvider">
-    /// The time provider to use, or <see langword="null"/> to use
-    /// <see cref="TimeProvider.System"/>.
-    /// </param>
-    /// <returns>
-    /// A new idempotency service.
-    /// </returns>
-    public static IdempotencyService Create(IIdempotencyStore store,
-        IdempotencyOptions options,
-        TimeProvider? timeProvider = null)
-    {
-        ArgumentNullException.ThrowIfNull(store);
-        ArgumentNullException.ThrowIfNull(options);
-
-        return new IdempotencyService(
-            store,
-            new JsonIdempotencySerializer(),
-            options,
-            timeProvider ?? TimeProvider.System);
-    }
-
-    /// <summary>
     /// Executes an operation under the supplied idempotency key.
     /// </summary>
     ///
