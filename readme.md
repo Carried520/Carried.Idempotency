@@ -141,6 +141,8 @@ Custom providers can be implemented using `IIdempotencyStore`.
 
 See the project documentation for guides, configuration, and API reference.
 
+**[Carried.Idempotency Documentation](https://carried520.github.io/Carried.Idempotency/)**
+
 ## 🧪 Example
 
 An example ASP.NET Core application is available at:
