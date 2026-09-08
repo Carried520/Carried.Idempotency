@@ -1,4 +1,5 @@
 using Carried.Idempotency.EntityFrameworkCore;
+using Carried.Idempotency.EntityFrameworkCore.Extensions;
 using Carried.Idempotency.EntityFrameworkCore.Store;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata;
@@ -10,7 +11,7 @@ public sealed class ModelBuilderExtensionsTests
     [Fact]
     public void AddIdempotency_UsesDefaultTableName()
     {
-        var options =
+        DbContextOptions<DefaultTestDbContext> options =
             new DbContextOptionsBuilder<DefaultTestDbContext>()
                 .UseSqlite("Data Source=:memory:")
                 .Options;
@@ -29,7 +30,7 @@ public sealed class ModelBuilderExtensionsTests
     [Fact]
     public void AddIdempotency_UsesConfiguredTableName()
     {
-        var options =
+        DbContextOptions<CustomTableTestDbContext> options =
             new DbContextOptionsBuilder<CustomTableTestDbContext>()
                 .UseSqlite("Data Source=:memory:")
                 .Options;
@@ -48,7 +49,7 @@ public sealed class ModelBuilderExtensionsTests
     [Fact]
     public void AddIdempotency_UsesConfiguredSchema()
     {
-        var options =
+        DbContextOptions<CustomSchemaTestDbContext> options =
             new DbContextOptionsBuilder<CustomSchemaTestDbContext>()
                 .UseSqlite("Data Source=:memory:")
                 .Options;
@@ -71,7 +72,7 @@ public sealed class ModelBuilderExtensionsTests
     public void AddIdempotency_WhenTableNameIsEmpty_Throws(
         string tableName)
     {
-        var options =
+        DbContextOptions<InvalidTableNameTestDbContext> options =
             new DbContextOptionsBuilder<InvalidTableNameTestDbContext>()
                 .UseSqlite("Data Source=:memory:")
                 .Options;
@@ -95,7 +96,7 @@ public sealed class ModelBuilderExtensionsTests
     [Fact]
     public void AddIdempotency_ConfiguresCompositePrimaryKey()
     {
-        var options =
+        DbContextOptions<DefaultTestDbContext> options =
             new DbContextOptionsBuilder<DefaultTestDbContext>()
                 .UseSqlite("Data Source=:memory:")
                 .Options;
@@ -124,7 +125,7 @@ public sealed class ModelBuilderExtensionsTests
     [Fact]
     public void AddIdempotency_ConfiguresScopeMaxLength()
     {
-        var options =
+        DbContextOptions<DefaultTestDbContext> options =
             new DbContextOptionsBuilder<DefaultTestDbContext>()
                 .UseSqlite("Data Source=:memory:")
                 .Options;
@@ -148,7 +149,7 @@ public sealed class ModelBuilderExtensionsTests
     [Fact]
     public void AddIdempotency_ConfiguresKeyMaxLength()
     {
-        var options =
+        DbContextOptions<DefaultTestDbContext> options =
             new DbContextOptionsBuilder<DefaultTestDbContext>()
                 .UseSqlite("Data Source=:memory:")
                 .Options;
@@ -172,7 +173,7 @@ public sealed class ModelBuilderExtensionsTests
     [Fact]
     public void AddIdempotency_ConfiguresRequiredProperties()
     {
-        var options =
+        DbContextOptions<DefaultTestDbContext> options =
             new DbContextOptionsBuilder<DefaultTestDbContext>()
                 .UseSqlite("Data Source=:memory:")
                 .Options;
@@ -212,7 +213,7 @@ public sealed class ModelBuilderExtensionsTests
     [Fact]
     public void AddIdempotency_AllowsNullableOwnerTokenAndPayload()
     {
-        var options =
+        DbContextOptions<DefaultTestDbContext> options =
             new DbContextOptionsBuilder<DefaultTestDbContext>()
                 .UseSqlite("Data Source=:memory:")
                 .Options;

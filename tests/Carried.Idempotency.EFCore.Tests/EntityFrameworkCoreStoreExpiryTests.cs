@@ -1,4 +1,4 @@
-using Carried.Idempotency.EntityFrameworkCore;
+using Carried.Idempotency.EntityFrameworkCore.Extensions;
 using Carried.Idempotency.EntityFrameworkCore.Store;
 using Carried.Idempotency.Options;
 using Carried.Idempotency.Store;

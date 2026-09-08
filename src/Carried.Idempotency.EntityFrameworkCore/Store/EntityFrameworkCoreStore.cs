@@ -10,8 +10,8 @@ internal sealed class EntityFrameworkCoreStore<TContext> : IIdempotencyStore whe
     private readonly IdempotencyOptions _options;
     private readonly TimeProvider _timeProvider;
 
-    private const int MaxKeyPartLength = 256;
-
+    private const int MaxAcquireAttempts = 3;
+    
     public EntityFrameworkCoreStore(TContext context,
         IdempotencyOptions options,
         TimeProvider? timeProvider = null)
@@ -31,7 +31,7 @@ internal sealed class EntityFrameworkCoreStore<TContext> : IIdempotencyStore whe
 
         var ownerToken = Guid.NewGuid();
 
-        for (var attempt = 0; attempt < 3; attempt++)
+        for (var attempt = 0; attempt < MaxAcquireAttempts; attempt++)
         {
             DateTime now = _timeProvider.GetUtcNow().UtcDateTime;
 
@@ -129,7 +129,7 @@ internal sealed class EntityFrameworkCoreStore<TContext> : IIdempotencyStore whe
         CancellationToken cancellationToken = default)
     {
         ValidateKey(key);
-        
+
         DateTime now = _timeProvider.GetUtcNow().UtcDateTime;
 
         int affected = await _context.Set<IdempotencyEntry>()
@@ -157,7 +157,7 @@ internal sealed class EntityFrameworkCoreStore<TContext> : IIdempotencyStore whe
         CancellationToken cancellationToken = default)
     {
         ValidateKey(key);
-        
+
         DateTime now = _timeProvider.GetUtcNow().UtcDateTime;
 
         int affected = await _context.Set<IdempotencyEntry>()
@@ -177,7 +177,7 @@ internal sealed class EntityFrameworkCoreStore<TContext> : IIdempotencyStore whe
         CancellationToken cancellationToken = default)
     {
         ValidateKey(key);
-        
+
         DateTime now = _timeProvider.GetUtcNow().UtcDateTime;
 
         int affected = await _context.Set<IdempotencyEntry>()
@@ -198,12 +198,12 @@ internal sealed class EntityFrameworkCoreStore<TContext> : IIdempotencyStore whe
     {
         if (key.Scope.Length > IdempotencyEntry.MaxKeyPartLength)
             throw new ArgumentException(
-                "Idempotency scope cannot exceed 256 characters.",
+                $"Idempotency scope cannot exceed {IdempotencyEntry.MaxKeyPartLength} characters.",
                 nameof(key));
 
         if (key.Value.Length > IdempotencyEntry.MaxKeyPartLength)
             throw new ArgumentException(
-                "Idempotency key cannot exceed 256 characters.",
+                $"Idempotency key cannot exceed {IdempotencyEntry.MaxKeyPartLength} characters.",
                 nameof(key));
     }
 }

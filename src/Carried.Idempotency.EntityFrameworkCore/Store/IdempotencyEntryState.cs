@@ -1,4 +1,4 @@
-namespace Carried.Idempotency.EntityFrameworkCore;
+namespace Carried.Idempotency.EntityFrameworkCore.Store;
 
 internal enum IdempotencyEntryState
 {

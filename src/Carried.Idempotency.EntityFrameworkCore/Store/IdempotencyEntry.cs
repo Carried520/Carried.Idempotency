@@ -1,11 +1,11 @@
-namespace Carried.Idempotency.EntityFrameworkCore;
+namespace Carried.Idempotency.EntityFrameworkCore.Store;
 
 internal sealed class IdempotencyEntry
 {
     internal const int MaxKeyPartLength = 256;
-    
-    public string Key { get; set; } = null!;
+
     public string Scope { get; set; } = null!;
+    public string Key { get; set; } = null!;
 
     public string Fingerprint { get; set; } = null!;
     public Guid? OwnerToken { get; set; }
