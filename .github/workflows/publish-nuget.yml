@@ -1,9 +1,11 @@
 name: Publish NuGet Packages
 
 on:
-  push:
-    tags:
-      - "v*.*.*"
+  release:
+    types: [released]
+
+env:
+  RELEASE_VERSION: ${{ github.event.release.tag_name }}
 
   release:
     types:
@@ -25,6 +27,17 @@ jobs:
     name: Build, Test and Publish
     runs-on: ubuntu-latest
 
+    services:
+      redis:
+        image: redis:8
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -37,12 +50,7 @@ jobs:
       - name: Get package version
         id: version
         shell: bash
-        run: |
-          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
-            echo "version=${{ inputs.version }}" >> "$GITHUB_OUTPUT"
-          else
-            echo "version=${GITHUB_REF_NAME#v}" >> "$GITHUB_OUTPUT"
-          fi
+        run: echo "version=${RELEASE_VERSION#v}" >> "$GITHUB_OUTPUT"
 
       - name: Restore
         run: dotnet restore
@@ -61,9 +69,25 @@ jobs:
           --output ./artifacts
           -p:PackageVersion=${{ steps.version.outputs.version }}
 
+      - name: Pack Dependency Injection
+        run: >
+          dotnet pack src/Carried.Idempotency.DependencyInjection/Carried.Idempotency.DependencyInjection.csproj
+          --configuration Release
+          --no-build
+          --output ./artifacts
+          -p:PackageVersion=${{ steps.version.outputs.version }}
+
       - name: Pack ASP.NET Core
         run: >
           dotnet pack src/Carried.Idempotency.AspNet/Carried.Idempotency.AspNet.csproj
+          --configuration Release
+          --no-build
+          --output ./artifacts
+          -p:PackageVersion=${{ steps.version.outputs.version }}
+
+      - name: Pack Redis
+        run: >
+          dotnet pack src/Carried.Idempotency.Redis/Carried.Idempotency.Redis.csproj
           --configuration Release
           --no-build
           --output ./artifacts
