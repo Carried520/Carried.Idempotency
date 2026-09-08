@@ -10,7 +10,6 @@ builder.Services.AddOpenApi();
 builder.Services.AddIdempotency(options =>
 {
     options.UseInMemory();
-    options.HeaderName = "Default-Key-Name";
     options.AddPolicy("strict" ,
         policy =>
         {

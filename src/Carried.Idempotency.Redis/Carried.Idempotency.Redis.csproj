@@ -3,13 +3,13 @@
     <PropertyGroup>
         <TargetFramework>net10.0</TargetFramework>
 
-        <PackageId>Carried.Idempotency.AspNet</PackageId>
+        <PackageId>Carried.Idempotency.Redis</PackageId>
         <Authors>Carried</Authors>
         <Description>
-            ASP.NET Core integration for Carried.Idempotency.
+            Redis provider for Carried.Idempotency using atomic Lua scripts for distributed coordination.
         </Description>
 
-        <PackageTags>idempotency;aspnetcore;dotnet;http</PackageTags>
+        <PackageTags>idempotency;redis;dotnet;distributed-systems</PackageTags>
 
         <PackageProjectUrl>https://github.com/Carried520/Carried.Idempotency</PackageProjectUrl>
         <RepositoryUrl>https://github.com/Carried520/Carried.Idempotency</RepositoryUrl>
@@ -24,24 +24,23 @@
         <Nullable>enable</Nullable>
     </PropertyGroup>
 
-
     <ItemGroup>
         <None Include="..\..\README.md"
               Pack="true"
-              PackagePath="\"/>
-    </ItemGroup>
-
-    <ItemGroup>
-        <FrameworkReference Include="Microsoft.AspNetCore.App"/>
+              PackagePath="\" />
     </ItemGroup>
 
     <ItemGroup>
         <ProjectReference Include="..\Carried.Idempotency.DependencyInjection\Carried.Idempotency.DependencyInjection.csproj" />
-        <ProjectReference Include="..\Carried.Idempotency\Carried.Idempotency.csproj"/>
+        <ProjectReference Include="..\Carried.Idempotency\Carried.Idempotency.csproj" />
     </ItemGroup>
 
     <ItemGroup>
-        <PackageReference Include="Microsoft.AspNetCore.OpenApi" Version="10.0.11"/>
+        <PackageReference Include="StackExchange.Redis" Version="3.1.31" />
+    </ItemGroup>
+
+    <ItemGroup>
+        <EmbeddedResource Include="Scripts\*.lua" />
     </ItemGroup>
 
 </Project>
