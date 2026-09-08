@@ -24,7 +24,7 @@ internal sealed class IdempotencyTestServer :
     }
 
     public static async Task<IdempotencyTestServer> CreateAsync(
-        Action<IdempotencyAspNetBuilder> configureAspNetOptions,
+        Action<IdempotencyBuilder> configureAspNetOptions,
         Action<IEndpointRouteBuilder>? configureEndpoints = null,
         Action<IServiceCollection>? configureServices = null,
         bool enableOpenApi = false

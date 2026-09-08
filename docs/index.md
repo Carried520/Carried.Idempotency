@@ -1,14 +1,13 @@
 # Carried.Idempotency
 
-**Carried.Idempotency** is a lightweight, storage-agnostic idempotency engine for .NET with ASP.NET Core integration and distributed Redis support.
+**Carried.Idempotency** is a lightweight, storage-agnostic idempotency engine for .NET with first-class ASP.NET Core integration.
 
-It coordinates idempotent operations using idempotency keys, operation fingerprints, leases, and retained results, helping applications prevent duplicate execution, coordinate concurrent requests, and safely replay completed operations.
+It coordinates idempotent operations using idempotency keys, operation fingerprints, leases, and retained results, helping applications prevent duplicate execution and safely replay completed operations.
 
 ## Features
 
-- **Storage-agnostic Core** — use the built-in in-memory store, the Redis provider, or implement `IIdempotencyStore` for another backend.
-- **Distributed Redis provider** — coordinate idempotency across application instances using atomic Redis operations.
-- **Lease-based ownership** — coordinates concurrent execution and prevents stale owners from completing, releasing, or renewing operations they no longer own.
+- **Storage-agnostic Core** — use the built-in in-memory store or provide your own implementation of `IIdempotencyStore`.
+- **Lease-based ownership** — coordinates concurrent execution and prevents stale owners from completing operations.
 - **Result replay** — completed operation results can be retained and returned without executing the operation again.
 - **Conflict detection** — detects when an idempotency key is reused for a different operation.
 - **ASP.NET Core integration** — protect Minimal API endpoints or controllers with opt-in idempotency.
@@ -23,9 +22,7 @@ It coordinates idempotent operations using idempotency keys, operation fingerpri
 | Package | Description |
 | --- | --- |
 | `Carried.Idempotency` | Core idempotency engine with no ASP.NET Core dependency. |
-| `Carried.Idempotency.DependencyInjection` | Dependency injection infrastructure for configuring idempotency providers. |
 | `Carried.Idempotency.AspNet` | ASP.NET Core integration built on top of the Core engine. |
-| `Carried.Idempotency.Redis` | Redis provider for distributed idempotency coordination. |
 
 ## Quick Start
 
@@ -58,13 +55,11 @@ Then opt an endpoint into idempotency:
 app.MapPost("/orders", async () =>
 {
     // Perform the operation.
-
-    return Results.Ok();
 })
 .RequireIdempotency();
 ```
 
-Clients provide an idempotency key using the `Idempotency-Key` request header:
+Clients provide an idempotency key using the `Idempotency-Key` request header.
 
 ```http
 Idempotency-Key: 550e8400-e29b-41d4-a716-446655440000
@@ -73,60 +68,6 @@ Idempotency-Key: 550e8400-e29b-41d4-a716-446655440000
 A repeated request using the same key and request fingerprint can receive the previously retained response instead of executing the endpoint again.
 
 Reusing the same key for a different request results in an idempotency conflict.
-
-> The in-memory provider stores idempotency state within a single application process.
-> For applications running across multiple instances, use a distributed provider such as Redis.
-
-## Redis
-
-Install the Redis provider:
-
-```bash
-dotnet add package Carried.Idempotency.Redis
-```
-
-Register a long-lived `IConnectionMultiplexer` with the application:
-
-```csharp
-builder.Services.AddSingleton<IConnectionMultiplexer>(_ =>
-    ConnectionMultiplexer.Connect(
-        builder.Configuration.GetConnectionString("Redis")!));
-```
-
-Then select Redis as the idempotency provider:
-
-```csharp
-builder.Services.AddIdempotency(options =>
-{
-    options.UseRedis();
-});
-```
-
-`UseRedis()` resolves the registered `IConnectionMultiplexer` and obtains an `IDatabase` from it.
-
-The application owns the connection multiplexer and its lifetime. `Carried.Idempotency.Redis` does not dispose it.
-
-Redis-specific configuration can be supplied when selecting the provider:
-
-```csharp
-builder.Services.AddIdempotency(options =>
-{
-    options.UseRedis(redis =>
-    {
-        redis.KeyPrefix = "my-app:idempotency:";
-    });
-});
-```
-
-The default Redis key prefix is:
-
-```text
-carried:idempotency:
-```
-
-Applications sharing a Redis database can use different prefixes to isolate their idempotency state.
-
-The Redis provider performs its state transitions atomically and uses Redis server time for lease and expiration decisions.
 
 ## Core
 
@@ -162,54 +103,24 @@ Returning `Release` returns the result without retaining it and releases ownersh
 return IdempotencyOperationResult<T>.Release(value);
 ```
 
-The Core engine can also use Redis directly:
-
-```csharp
-IConnectionMultiplexer connection = /* ... */;
-IDatabase database = connection.GetDatabase();
-
-var options = new IdempotencyOptions
-{
-    LeaseDuration = TimeSpan.FromMinutes(5),
-    CompletedRetention = TimeSpan.FromHours(24)
-};
-
-var idempotency = IdempotencyService.CreateRedis(
-    database,
-    options);
-```
-
 ## How It Works
 
 When an operation is executed with an idempotency key:
 
 1. **New key** — ownership is acquired and the operation executes.
-2. **Active key** — another execution using the same key and fingerprint is reported as already in progress.
+2. **Active key** — another execution using the same key and operation is reported as already in progress.
 3. **Completed key** — the previously retained result is replayed.
-4. **Conflicting key** — reuse of an active or retained key for a different operation is rejected.
+4. **Conflicting key** — reuse of the key for a different operation is rejected.
 5. **Expired key** — the key can be acquired again.
 
-While an operation owns a key, its lease is automatically renewed. Ownership is represented by an owner token, allowing the configured store to reject state transitions from stale owners.
-
-If ownership is lost before the requested state transition can be applied, the operation cannot overwrite the state of a newer owner.
-
-## Storage Providers
-
-| Provider | Package | Use case |
-| --- | --- | --- |
-| In-memory | `Carried.Idempotency` | Single-process applications, development, and testing |
-| Redis | `Carried.Idempotency.Redis` | Distributed applications and multiple application instances |
-
-Additional providers can be implemented using `IIdempotencyStore`.
+While an operation owns a key, its lease is automatically renewed. If ownership is lost before completion, the operation cannot overwrite the state of a newer owner.
 
 ## Documentation
 
 Use the documentation and API reference to learn more about:
 
-- Getting started
 - Core idempotency semantics
 - ASP.NET Core integration
-- Redis
 - Policies
 - Request fingerprinting
 - Response replay
